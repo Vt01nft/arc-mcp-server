@@ -71,9 +71,22 @@ export default function PostJobPage() {
   }, [isSuccess, receipt, address, form, router]);
 
   useEffect(() => {
-    if (writeError) {
-      const msg = (writeError as Error).message ?? String(writeError);
-      setError(msg.includes("User rejected") ? "Transaction rejected in wallet." : msg);
+    if (!writeError) return;
+    // wagmi errors nest the useful message in shortMessage or cause
+    const err = writeError as Error & { shortMessage?: string; cause?: { message?: string } };
+    const msg =
+      err.shortMessage ||
+      err.cause?.message ||
+      err.message ||
+      String(writeError);
+    if (msg.includes("User rejected") || msg.includes("user rejected")) {
+      setError("Transaction rejected in wallet.");
+    } else if (msg.includes("client cannot be evaluator") || msg.includes("reverted")) {
+      setError(
+        "Transaction reverted. If your wallet is the evaluator address, use a different wallet to post jobs."
+      );
+    } else {
+      setError(msg || "Transaction failed.");
     }
   }, [writeError]);
 
@@ -88,6 +101,12 @@ export default function PostJobPage() {
     e.preventDefault();
     if (!form.description || !form.providerAddress) {
       setError("Description and provider address are required.");
+      return;
+    }
+    if (address?.toLowerCase() === EVALUATOR_ADDRESS.toLowerCase()) {
+      setError(
+        "Your connected wallet is the evaluator address. Use a different wallet to post jobs — the evaluator cannot also be the job client."
+      );
       return;
     }
     setError(null);
