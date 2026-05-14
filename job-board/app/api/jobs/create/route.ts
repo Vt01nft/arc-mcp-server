@@ -90,9 +90,10 @@ export async function POST(req: NextRequest) {
       status: "created",
     });
   } catch (err) {
-    console.error("Create job error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Create job error:", message);
     return NextResponse.json(
-      { error: "Failed to create job. Check your wallet configuration." },
+      { error: message },
       { status: 500 }
     );
   }
