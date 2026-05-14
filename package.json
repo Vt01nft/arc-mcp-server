@@ -1,0 +1,29 @@
+{
+  "name": "arc-mcp-server",
+  "version": "1.0.0",
+  "description": "Arc Live MCP Server — interact with Arc testnet from Claude Code: balances, ERC-8183 jobs, ERC-8004 agents, events, transfers",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx --env-file=.env src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "bin": {
+    "arc-mcp-server": "dist/index.js"
+  },
+  "keywords": ["mcp", "arc", "stablecoin", "usdc", "erc-8183", "erc-8004", "ai-agents"],
+  "author": "vt",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "viem": "^2.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "arc-multi-evaluator-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "npx tsx demo.ts"
+  },
+  "dependencies": {
+    "viem": "^2.49.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3",
+    "@types/node": "^22.0.0"
+  }
+}

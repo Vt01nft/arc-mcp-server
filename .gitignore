@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs (dist/ is committed so users can run without building)
+.next/
+out/
+
+# Env files — NEVER commit private keys or API keys
+.env
+*.env
+.env.local
+.env.*.local
+
+# Foundry
+cache/
+**/cache/
+broadcast/
+**/broadcast/
+
+# Misc
+.DS_Store
+*.js.map
+tsconfig.tsbuildinfo
+*.tsbuildinfo
