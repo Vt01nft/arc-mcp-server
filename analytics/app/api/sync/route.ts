@@ -32,13 +32,14 @@ export async function POST(_req: NextRequest) {
 
     // Fetch each event type individually (viem filters by topic[0])
     const fetchPromises = ERC8183_EVENTS_ABI.map((eventDef) =>
-      publicClient.getLogs({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (publicClient.getLogs as any)({
         address: ADDRESSES.ERC8183_JOB,
-        event: eventDef as Parameters<typeof publicClient.getLogs>[0]["event"],
+        event: eventDef,
         fromBlock,
         toBlock,
-      }).then((logs) => logs.map((log) => ({ log, eventName: eventDef.name })))
-       .catch(() => [] as Array<{ log: (typeof logs)[0]; eventName: string }>)
+      }).then((logs: any[]) => logs.map((log: any) => ({ log, eventName: eventDef.name })))
+       .catch(() => [] as Array<{ log: any; eventName: string }>)
     );
 
     const results = await Promise.all(fetchPromises);
