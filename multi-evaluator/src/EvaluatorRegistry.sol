@@ -111,7 +111,7 @@ contract EvaluatorRegistry {
     }
 
     /// @notice Pseudo-random selection of 3 active evaluators for a jury.
-    ///         Not truly random — replace with VRF in production.
+    ///         Not truly random - replace with VRF in production.
     function selectJury(uint256 seed) external view returns (address[3] memory jury) {
         address[] memory pool = new address[](evaluatorList.length);
         uint256 poolSize;

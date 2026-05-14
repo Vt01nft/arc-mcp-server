@@ -82,7 +82,7 @@ export default function JobDetailPage() {
       const result: EvaluateResponse = await res.json();
       setEvalResult(result);
     } catch {
-      // silent — user can retry
+      // silent - user can retry
     }
     setEvaluating(false);
   }
@@ -168,7 +168,7 @@ export default function JobDetailPage() {
         ))}
       </div>
 
-      {/* Provider: submit deliverable — visible when Funded (status 1) and connected as provider */}
+      {/* Provider: submit deliverable - visible when Funded (status 1) and connected as provider */}
       {chain.status === 1 && isProvider && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4">
           <h2 className="text-sm font-semibold text-zinc-100">Submit Deliverable</h2>
@@ -224,7 +224,7 @@ export default function JobDetailPage() {
         </div>
       )}
 
-      {/* Evaluator panel — visible when Submitted (status 2) */}
+      {/* Evaluator panel - visible when Submitted (status 2) */}
       {chain.status === 2 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -277,7 +277,7 @@ export default function JobDetailPage() {
             </div>
           )}
 
-          {/* Approve / Reject — evaluator only, after Claude evaluates */}
+          {/* Approve / Reject - evaluator only, after Claude evaluates */}
           {isEvaluator && activeEvaluation && (
             <div className="flex flex-col gap-3 pt-3 border-t border-zinc-800">
               <input
@@ -339,8 +339,8 @@ export default function JobDetailPage() {
         >
           <p className={`text-sm font-semibold ${chain.status === 3 ? "text-emerald-400" : "text-red-400"}`}>
             {chain.status === 3
-              ? "Job completed — USDC released to provider"
-              : "Job rejected — USDC refunded to client"}
+              ? "Job completed - USDC released to provider"
+              : "Job rejected - USDC refunded to client"}
           </p>
           {job.evaluation && (
             <p className="text-xs text-zinc-400 mt-2 leading-relaxed">

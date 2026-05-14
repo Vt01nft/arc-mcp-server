@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// Lazy singleton — avoids module-level throws during build when env vars aren't set
+// Lazy singleton - avoids module-level throws during build when env vars aren't set
 let _client: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient {
@@ -23,7 +23,7 @@ export const supabase = new Proxy({} as SupabaseClient, {
   },
 });
 
-// Service-role client — only use in API routes (server-side only)
+// Service-role client - only use in API routes (server-side only)
 export function getServiceClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

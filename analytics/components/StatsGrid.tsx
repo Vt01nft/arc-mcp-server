@@ -33,7 +33,7 @@ export function StatsGrid({ stats, loading }: Props) {
         <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
           <p className="text-xs text-zinc-500 mb-1">{label}</p>
           <p className="text-xl font-bold text-white">
-            {value !== undefined && value !== null ? `${value}${suffix}` : "—"}
+            {value !== undefined && value !== null ? `${value}${suffix}` : "-"}
           </p>
         </div>
       ))}

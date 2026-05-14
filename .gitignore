@@ -23,3 +23,8 @@ broadcast/
 *.js.map
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Repo-specific
+extracted/
+.claude/
+*.zip

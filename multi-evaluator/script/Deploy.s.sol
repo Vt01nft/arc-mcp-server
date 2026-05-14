@@ -31,7 +31,7 @@ contract DeployScript is Script {
         // Step 2: Deploy hook pointing to registry
         MultiEvaluatorHook hook = new MultiEvaluatorHook(address(registry));
 
-        // Step 3: Deploy VoteEscrow (standalone — no dependency on registry/hook)
+        // Step 3: Deploy VoteEscrow (standalone - no dependency on registry/hook)
         VoteEscrow voteEscrow = new VoteEscrow();
 
         vm.stopBroadcast();

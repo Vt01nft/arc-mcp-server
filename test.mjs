@@ -111,7 +111,7 @@ async function run() {
     console.log(`  Block range: ${evData.range?.from} → ${evData.range?.to}`);
   }
 
-  console.log("\n✅ All tests passed — arc-mcp-server is live on Arc Testnet\n");
+  console.log("\n✅ All tests passed - arc-mcp-server is live on Arc Testnet\n");
   server.kill();
 }
 

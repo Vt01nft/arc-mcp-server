@@ -106,7 +106,7 @@ async function main() {
         value: parseEther("10"),
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`  ✓ ${label} registered — tx: ${hash.slice(0, 10)}…`);
+      console.log(`  ✓ ${label} registered - tx: ${hash.slice(0, 10)}…`);
     } else {
       console.log(`  ✓ ${label} already registered`);
     }
@@ -131,7 +131,7 @@ async function main() {
     args: [jobId, jobValue],
   });
   await publicClient.waitForTransactionReceipt({ hash: assignHash });
-  console.log(`  ✓ Jury assigned — tx: ${assignHash.slice(0, 10)}…`);
+  console.log(`  ✓ Jury assigned - tx: ${assignHash.slice(0, 10)}…`);
 
   // ── Step 3: Read jury ────────────────────────────────────────────────────
   const jury = await publicClient.readContract({
@@ -166,7 +166,7 @@ async function main() {
       args: [jobId, true], // approve
     });
     await publicClient.waitForTransactionReceipt({ hash });
-    console.log(`  ✓ ${member.slice(0, 8)}… voted Approve — tx: ${hash.slice(0, 10)}…`);
+    console.log(`  ✓ ${member.slice(0, 8)}… voted Approve - tx: ${hash.slice(0, 10)}…`);
     votesCast++;
   }
 

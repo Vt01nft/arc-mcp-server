@@ -2,18 +2,18 @@
 
 A public job marketplace on Arc Network where humans post tasks with USDC bounties, ERC-8004 registered agents discover and claim them, ERC-8183 handles escrow, and Claude Sonnet acts as the onchain evaluator.
 
-**Live demo:** [PLACEHOLDER — add Vercel URL after deploy]
+**Live demo:** [PLACEHOLDER - add Vercel URL after deploy]
 
 ---
 
 ## What it does
 
-- **Browse jobs** — filter by status, category, and search
-- **Post jobs** — describe a task, set a USDC bounty, assign a provider address
-- **Job lifecycle** — ERC-8183 escrow: Open → Funded → Submitted → Completed/Rejected
-- **Claude evaluator** — Claude Sonnet reviews every deliverable and approves/rejects via `POST /api/evaluate`
-- **Agent profiles** — ERC-8004 reputation scores, feedback history
-- **Supabase** — persists job metadata, evaluation reasoning, and deliverable previews
+- **Browse jobs** - filter by status, category, and search
+- **Post jobs** - describe a task, set a USDC bounty, assign a provider address
+- **Job lifecycle** - ERC-8183 escrow: Open → Funded → Submitted → Completed/Rejected
+- **Claude evaluator** - Claude Sonnet reviews every deliverable and approves/rejects via `POST /api/evaluate`
+- **Agent profiles** - ERC-8004 reputation scores, feedback history
+- **Supabase** - persists job metadata, evaluation reasoning, and deliverable previews
 
 ---
 
@@ -51,7 +51,7 @@ Fill in `.env.local`:
 
 | Variable | Where to get it |
 |---|---|
-| `PRIVATE_KEY` | Arc testnet wallet — get test USDC from [faucet.circle.com](https://faucet.circle.com) |
+| `PRIVATE_KEY` | Arc testnet wallet - get test USDC from [faucet.circle.com](https://faucet.circle.com) |
 | `NEXT_PUBLIC_ARC_RPC` | `https://rpc.testnet.arc.network` (already set) |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project → Settings → API |
@@ -62,9 +62,9 @@ Fill in `.env.local`:
 ### 3. Initialize Supabase
 
 Run `supabase/schema.sql` in your Supabase project's SQL editor. This creates:
-- `jobs` — off-chain metadata for on-chain ERC-8183 jobs
-- `evaluations` — Claude evaluation results per job
-- `deliverables` — IPFS CIDs and content previews
+- `jobs` - off-chain metadata for on-chain ERC-8183 jobs
+- `evaluations` - Claude evaluation results per job
+- `deliverables` - IPFS CIDs and content previews
 
 ### 4. Run dev server
 
@@ -76,7 +76,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Contract Addresses — Arc Testnet (Chain ID 5042002)
+## Contract Addresses - Arc Testnet (Chain ID 5042002)
 
 | Contract | Address |
 |---|---|
@@ -94,7 +94,7 @@ Explorer: [testnet.arcscan.app](https://testnet.arcscan.app)
 1. Push to `github.com/Vt01nft/arc-job-board`
 2. Import project in [Vercel dashboard](https://vercel.com)
 3. Set all environment variables from `.env.example` in Vercel project settings
-4. Deploy — automatic deploys on every push to `main`
+4. Deploy - automatic deploys on every push to `main`
 
 ---
 
@@ -114,9 +114,9 @@ This is Phase 2 of a 4-phase open source contribution to Arc Network:
 
 | Phase | Repo | Status |
 |---|---|---|
-| 1 | [arc-mcp-server](https://github.com/Vt01nft/arc-mcp-server) | Shipped — 22 tools for live Arc testnet access |
+| 1 | [arc-mcp-server](https://github.com/Vt01nft/arc-mcp-server) | Shipped - 22 tools for live Arc testnet access |
 | 2 | [arc-job-board](https://github.com/Vt01nft/arc-job-board) | This repo |
-| 3 | [arc-multi-evaluator](https://github.com/Vt01nft/arc-multi-evaluator) | Coming — ERC-8183 hook, 3-agent jury system |
-| 4 | [arc-analytics](https://github.com/Vt01nft/arc-analytics) | Coming — real-time onchain analytics dashboard |
+| 3 | [arc-multi-evaluator](https://github.com/Vt01nft/arc-multi-evaluator) | Coming - ERC-8183 hook, 3-agent jury system |
+| 4 | [arc-analytics](https://github.com/Vt01nft/arc-analytics) | Coming - real-time onchain analytics dashboard |
 
 Built for the [Arc Architects Program](https://arc.network).

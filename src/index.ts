@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Arc Live MCP Server
- * —————————————————————————————————————————————————————————————————
+ * -----------------------------------------------------------------
  * Gives Claude Code (and any MCP client) direct live access to the
- * Arc Testnet — balances, ERC-8183 job lifecycle, ERC-8004 agent
+ * Arc Testnet - balances, ERC-8183 job lifecycle, ERC-8004 agent
  * reputation, events, and USDC transfers.
  *
- * Transport: stdio (default) — works with Claude Code out of the box
+ * Transport: stdio (default) - works with Claude Code out of the box
  *
  * Setup:
  *   npm install && npm run build
@@ -18,7 +18,7 @@
  * Chain: Arc Testnet | Chain ID: 5042002
  * RPC:   https://rpc.testnet.arc.network
  * Docs:  https://docs.arc.network
- * —————————————————————————————————————————————————————————————————
+ * -----------------------------------------------------------------
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -143,7 +143,7 @@ const TOOLS = [
   {
     name: "arc_create_job",
     description:
-      "Create a new ERC-8183 job on Arc Testnet. Defines provider, evaluator, description, and expiry. Does NOT lock USDC yet — call arc_fund_job next. Requires PRIVATE_KEY.",
+      "Create a new ERC-8183 job on Arc Testnet. Defines provider, evaluator, description, and expiry. Does NOT lock USDC yet - call arc_fund_job next. Requires PRIVATE_KEY.",
     inputSchema: toJsonSchema(createJobSchema),
   },
   {
@@ -155,7 +155,7 @@ const TOOLS = [
   {
     name: "arc_submit_deliverable",
     description:
-      "Provider submits deliverable for an ERC-8183 job. Pass the work content or IPFS URI — it will be hashed to bytes32 onchain. Requires PRIVATE_KEY.",
+      "Provider submits deliverable for an ERC-8183 job. Pass the work content or IPFS URI - it will be hashed to bytes32 onchain. Requires PRIVATE_KEY.",
     inputSchema: toJsonSchema(submitDeliverableSchema),
   },
   {
@@ -219,7 +219,7 @@ const TOOLS = [
   {
     name: "arc_get_job_events",
     description:
-      "Get the full event timeline for a specific ERC-8183 job — creation, funding, submission, completion/rejection in chronological order.",
+      "Get the full event timeline for a specific ERC-8183 job - creation, funding, submission, completion/rejection in chronological order.",
     inputSchema: toJsonSchema(getJobEventsSchema),
   },
 ];

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Arc Analytics — Live Testnet Dashboard",
+  title: "Arc Analytics - Live Testnet Dashboard",
   description: "Real-time ERC-8183 job analytics and event feed for Arc Testnet, narrated by Claude.",
 };
 
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="max-w-6xl mx-auto px-6 py-8">{children}</main>
         <footer className="border-t border-zinc-800 px-6 py-4 text-center text-xs text-zinc-600">
-          Arc Analytics — Phase 4 of the{" "}
+          Arc Analytics - Phase 4 of the{" "}
           <a href="https://github.com/Vt01nft" className="hover:text-zinc-400 transition-colors">
             Arc Ecosystem
           </a>{" "}

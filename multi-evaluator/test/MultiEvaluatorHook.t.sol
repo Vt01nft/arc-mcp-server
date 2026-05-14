@@ -39,7 +39,7 @@ contract MultiEvaluatorHookTest is Test {
     }
 
     function test_SelectJuryRequires3() public {
-        // Only 2 evaluators — should revert
+        // Only 2 evaluators - should revert
         vm.prank(alice);
         registry.register{value: STAKE}();
         vm.prank(bob);

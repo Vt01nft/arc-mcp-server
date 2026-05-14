@@ -1,6 +1,6 @@
 import { defineChain } from "viem";
 
-// Shared chain definition — safe to import from both server and client
+// Shared chain definition - safe to import from both server and client
 export const arcTestnet = defineChain({
   id: 5042002,
   name: "Arc Testnet",

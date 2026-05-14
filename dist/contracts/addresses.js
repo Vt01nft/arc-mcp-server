@@ -1,4 +1,4 @@
-// Arc Testnet — verified from official docs (docs.arc.network)
+// Arc Testnet - verified from official docs (docs.arc.network)
 // Last verified: May 2026
 export const ARC_TESTNET = {
     id: 5042002,
@@ -14,7 +14,7 @@ export const ARC_TESTNET = {
     },
 };
 export const ADDRESSES = {
-    // USDC — native gas token + ERC-20 interface (6 decimals for transfers)
+    // USDC - native gas token + ERC-20 interface (6 decimals for transfers)
     // source: https://docs.arc.network/arc/references/contract-addresses
     USDC: "0x3600000000000000000000000000000000000000",
     // ERC-8183: Job escrow + settlement standard

@@ -16,10 +16,10 @@ export async function arcGetBalance(args: z.infer<typeof getBalanceSchema>) {
     throw new Error(`Invalid address: ${args.address}`);
   }
 
-  // Native balance (18 decimals — gas precision)
+  // Native balance (18 decimals - gas precision)
   const nativeBalance = await client.getBalance({ address: args.address });
 
-  // ERC-20 USDC balance (6 decimals — transfer precision)
+  // ERC-20 USDC balance (6 decimals - transfer precision)
   const erc20Balance = await client.readContract({
     address: ADDRESSES.USDC,
     abi: USDC_ABI,

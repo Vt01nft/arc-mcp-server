@@ -207,7 +207,7 @@ export const ERC8183_ABI = [
 export const ERC8004_REPUTATION_ABI = [
     // ── Write ──
     {
-        // giveFeedback — confirmed signature from Arc docs
+        // giveFeedback - confirmed signature from Arc docs
         // source: https://docs.arc.network/arc/tutorials/register-your-first-ai-agent
         name: "giveFeedback",
         type: "function",
@@ -250,7 +250,7 @@ export const ERC8004_REPUTATION_ABI = [
 export const ERC8004_VALIDATION_ABI = [
     // ── Write ──
     {
-        // validationRequest — confirmed signature from Arc docs
+        // validationRequest - confirmed signature from Arc docs
         name: "validationRequest",
         type: "function",
         stateMutability: "nonpayable",
@@ -263,7 +263,7 @@ export const ERC8004_VALIDATION_ABI = [
         outputs: [],
     },
     {
-        // validationResponse — validator submits response (100=pass, 0=fail)
+        // validationResponse - validator submits response (100=pass, 0=fail)
         name: "validationResponse",
         type: "function",
         stateMutability: "nonpayable",

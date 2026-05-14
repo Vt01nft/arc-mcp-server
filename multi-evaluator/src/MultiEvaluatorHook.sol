@@ -119,7 +119,7 @@ contract MultiEvaluatorHook {
         uint256 slashAmount = (fee * EvaluatorRegistry(registry).SLASH_PERCENT()) / 100;
 
         for (uint8 i = 0; i < 3; i++) {
-            if (jury.votes[i] == Vote.Pending) continue; // didn't vote — no reward or slash
+            if (jury.votes[i] == Vote.Pending) continue; // didn't vote - no reward or slash
 
             bool votedCorrectly = approved
                 ? jury.votes[i] == Vote.Approve

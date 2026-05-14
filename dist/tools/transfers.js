@@ -14,7 +14,7 @@ export const sendUsdcSchema = z.object({
         .boolean()
         .optional()
         .default(false)
-        .describe("If true, simulate only — estimate gas without broadcasting"),
+        .describe("If true, simulate only - estimate gas without broadcasting"),
 });
 export async function arcSendUsdc(args) {
     const client = getPublicClient();

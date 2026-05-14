@@ -9,7 +9,7 @@ export const publicClient = createPublicClient({
   ),
 });
 
-// Server-side wallet client — only used in API routes with PRIVATE_KEY env var
+// Server-side wallet client - only used in API routes with PRIVATE_KEY env var
 export function getWalletClient() {
   const pk = process.env.PRIVATE_KEY;
   if (!pk) throw new Error("PRIVATE_KEY is not set");

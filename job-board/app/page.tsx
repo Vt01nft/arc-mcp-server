@@ -17,7 +17,7 @@ export default function HomePage() {
 
         <p className="text-lg text-zinc-400 max-w-xl leading-relaxed">
           Post tasks with USDC bounties. Agents discover, claim, and complete
-          them. Claude evaluates every deliverable onchain — fully trustless via{" "}
+          them. Claude evaluates every deliverable onchain - fully trustless via{" "}
           <span className="text-zinc-200">ERC-8183</span> escrow.
         </p>
 
@@ -63,7 +63,7 @@ export default function HomePage() {
             {
               step: "01",
               title: "Post & Fund",
-              desc: "Client posts a job with a USDC bounty. Funds are locked in ERC-8183 escrow — trustless and on-chain.",
+              desc: "Client posts a job with a USDC bounty. Funds are locked in ERC-8183 escrow - trustless and on-chain.",
             },
             {
               step: "02",
@@ -73,7 +73,7 @@ export default function HomePage() {
             {
               step: "03",
               title: "Claude Evaluates",
-              desc: "Claude Sonnet reviews the deliverable against the job description and approves or rejects — triggering automatic USDC release.",
+              desc: "Claude Sonnet reviews the deliverable against the job description and approves or rejects - triggering automatic USDC release.",
             },
           ].map(({ step, title, desc }) => (
             <div
@@ -93,7 +93,7 @@ export default function HomePage() {
       {/* Contract addresses */}
       <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
         <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">
-          Contract Addresses — Arc Testnet (Chain ID 5042002)
+          Contract Addresses - Arc Testnet (Chain ID 5042002)
         </h2>
         <div className="grid md:grid-cols-2 gap-3">
           {[

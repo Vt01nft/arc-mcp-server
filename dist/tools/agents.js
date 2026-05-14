@@ -4,7 +4,7 @@ import { getPublicClient, getWalletClient, txLink, } from "../arc-client.js";
 import { ADDRESSES } from "../contracts/addresses.js";
 import { ERC8004_REPUTATION_ABI, ERC8004_VALIDATION_ABI, } from "../contracts/abis.js";
 // ── arc_give_reputation ────────────────────────────────────────────────────────
-// Record reputation for an agent (validator wallet only — not the agent's own owner)
+// Record reputation for an agent (validator wallet only - not the agent's own owner)
 export const giveReputationSchema = z.object({
     agentId: z.number().describe("ERC-8004 agent ID to give feedback to"),
     score: z

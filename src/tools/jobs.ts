@@ -26,7 +26,7 @@ export const createJobSchema = z.object({
   ),
   description: z
     .string()
-    .describe("Job description — will be hashed to bytes32 onchain"),
+    .describe("Job description - will be hashed to bytes32 onchain"),
   expiryHours: z
     .number()
     .min(1)
@@ -131,7 +131,7 @@ export async function arcGetJob(args: z.infer<typeof getJobSchema>) {
 export async function arcGetJobCount() {
   const client = getPublicClient();
 
-  // RPC limits getLogs to 10,000 blocks per call — paginate in 9,999-block chunks.
+  // RPC limits getLogs to 10,000 blocks per call - paginate in 9,999-block chunks.
   // Scan backwards until we find the deployment (no events for 3 consecutive chunks).
   const CHUNK = 9_999n;
   const MAX_EMPTY_CHUNKS = 3; // stop after 3 consecutive empty chunks
@@ -179,7 +179,7 @@ export async function arcFundJob(args: z.infer<typeof fundJobSchema>) {
   const client = getPublicClient();
   const { client: walletClient, account } = getWalletClient();
 
-  // On Arc, USDC is the native token — fundJob takes msg.value (18 decimals)
+  // On Arc, USDC is the native token - fundJob takes msg.value (18 decimals)
   const amountNative = parseUsdc(args.amount, 18);
 
   const hash = await walletClient.writeContract({
@@ -211,7 +211,7 @@ export const submitDeliverableSchema = z.object({
   deliverable: z
     .string()
     .describe(
-      "Deliverable content or IPFS/Arweave URI — will be hashed to bytes32 onchain. " +
+      "Deliverable content or IPFS/Arweave URI - will be hashed to bytes32 onchain. " +
       "For large outputs, store on IPFS and pass the CID here."
     ),
 });
@@ -254,7 +254,7 @@ export const completeJobSchema = z.object({
   reason: z
     .string()
     .default("Deliverable accepted")
-    .describe("Reason for completion — stored as bytes32 onchain"),
+    .describe("Reason for completion - stored as bytes32 onchain"),
 });
 
 export async function arcCompleteJob(args: z.infer<typeof completeJobSchema>) {
@@ -292,7 +292,7 @@ export const rejectJobSchema = z.object({
   reason: z
     .string()
     .default("Deliverable rejected")
-    .describe("Reason for rejection — stored as bytes32 onchain"),
+    .describe("Reason for rejection - stored as bytes32 onchain"),
 });
 
 export async function arcRejectJob(args: z.infer<typeof rejectJobSchema>) {

@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 /// @notice Time-locked stake escrow for evaluator rewards.
 ///         Evaluators can lock USDC for a defined period to boost their jury selection
 ///         weight and earn compound rewards from fees. Locked stake cannot be slashed
-///         while in the lock period — acts as a commitment device.
+///         while in the lock period - acts as a commitment device.
 contract VoteEscrow {
     // ── Constants ─────────────────────────────────────────────────────────────
     uint256 public constant MIN_LOCK_DURATION = 7 days;
@@ -33,7 +33,7 @@ contract VoteEscrow {
         require(msg.value > 0, "No value sent");
         require(duration >= MIN_LOCK_DURATION, "Lock too short");
         require(duration <= MAX_LOCK_DURATION, "Lock too long");
-        require(locks[msg.sender].amount == 0, "Already locked — extend instead");
+        require(locks[msg.sender].amount == 0, "Already locked - extend instead");
 
         uint256 unlockAt = block.timestamp + duration;
         uint256 weight = _computeWeight(msg.value, duration);

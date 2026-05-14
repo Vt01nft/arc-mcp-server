@@ -38,7 +38,7 @@ export function JobsChart({ data, loading }: Props) {
         <div className="h-48 bg-zinc-800 rounded-lg animate-pulse" />
       ) : data.length === 0 ? (
         <div className="h-48 flex items-center justify-center text-zinc-600 text-sm">
-          No data yet — sync chain to populate
+          No data yet - sync chain to populate
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={220}>

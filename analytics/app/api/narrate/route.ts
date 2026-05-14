@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const trend7 = last7.reduce((s, d) => s + d.jobs_created, 0);
   const prev7 = daily.slice(-14, -7).reduce((s, d) => s + d.jobs_created, 0);
 
-  const prompt = `You are an analyst narrating live activity on Arc Testnet — a stablecoin-native L1 blockchain by Circle where USDC is the native gas token.
+  const prompt = `You are an analyst narrating live activity on Arc Testnet - a stablecoin-native L1 blockchain by Circle where USDC is the native gas token.
 
 Current stats:
 - Total jobs ever created: ${stats.total_jobs}
