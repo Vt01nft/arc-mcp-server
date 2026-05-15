@@ -21,9 +21,9 @@ The goal is to show the Arc and Circle teams what becomes possible when you comb
 | Phase | Folder | What It Does | Status |
 |---|---|---|---|
 | 1 | `/` | MCP server - 21 tools for live Arc Testnet access | Live |
-| 2 | `/job-board` | Job marketplace where humans post tasks and AI agents complete them | Complete |
+| 2 | `/job-board` | Job marketplace where humans post tasks and AI agents complete them | Live: [arc-job-board.vercel.app](https://arc-job-board.vercel.app) |
 | 3 | `/multi-evaluator` | Smart contracts that replace a single evaluator with a 3-agent jury | Live on Arc Testnet |
-| 4 | `/analytics` | Live dashboard that tracks all onchain job activity and narrates it with Claude | Complete |
+| 4 | `/analytics` | Live dashboard that tracks all onchain job activity and narrates it with Claude | Live: [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app) |
 
 ---
 
@@ -64,16 +64,23 @@ This runs a live smoke test against Arc Testnet and prints real data including c
 
 **The problem:** There is no public marketplace where humans can post tasks for AI agents to complete, with real USDC on the line and an AI evaluator deciding the outcome.
 
-**What it does:** A Next.js web application where anyone can post a job with a USDC bounty, assign a provider address, and let the ERC-8183 contract handle the escrow. When the provider submits their deliverable, Claude Sonnet evaluates it and gives a recommendation. The evaluator then approves or rejects onchain, releasing or refunding the USDC.
+**Live:** [arc-job-board.vercel.app](https://arc-job-board.vercel.app)
 
-**How it works step by step:**
-1. A client posts a job with a description, USDC amount, and provider address
-2. The contract locks the USDC in escrow
-3. The provider does the work and submits a deliverable hash onchain
-4. Claude evaluates the deliverable against the job description
-5. The evaluator approves or rejects, which triggers the USDC transfer
+**What it does:** A Next.js web application where anyone can post a job with a USDC bounty and let the onchain escrow contract settle it. When the provider submits their deliverable, Claude evaluates it and gives a recommendation, then the evaluator approves or rejects onchain, releasing or refunding the USDC.
 
-**Tech stack:** Next.js 15, wagmi v3, RainbowKit, viem, Supabase, Anthropic SDK, Tailwind v4
+The deployed ERC-8183 contract is `AgenticCommerce` (an upgradeable proxy at `0x0747EEf0706327138c69792bF28Cd525089e4583`, implementation `0xa316fd02827242d537f84730f8a37d0ba5fd351a`). The app's ABI is taken verbatim from the verified contract on ArcScan, not hand-written.
+
+**The real escrow lifecycle (verified end to end on Arc Testnet):**
+1. Client calls `createJob(provider, evaluator, expiredAt, description, hook)` - job opens with budget 0
+2. Provider calls `setBudget` to quote the USDC price for the job
+3. Client `approve`s USDC then calls `fund`, which pulls the budget into escrow via `transferFrom` and moves the job to Funded
+4. Provider calls `submit` with the deliverable hash
+5. Claude evaluates the deliverable against the description (`POST /api/evaluate`)
+6. Evaluator calls `complete` (pays the provider) or `reject` (refunds the client)
+
+Browse Jobs reads Supabase metadata merged with an onchain fallback (jobs whose offchain save failed still appear, scanned from `JobCreated` logs).
+
+**Tech stack:** Next.js 16, wagmi v3, RainbowKit, viem, Supabase, Anthropic SDK, Tailwind v4
 
 **Run locally:**
 
@@ -85,7 +92,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-**Deploy:** Vercel and Supabase. See `job-board/README.md` for the full setup guide.
+**Deploy:** Vercel and Supabase. The Vercel project Root Directory is `job-board`, so deploy from the repo root. Run `job-board/supabase/schema.sql` in the Supabase SQL editor before first use.
 
 ---
 
@@ -132,15 +139,18 @@ address, confirming the nonce-predicted circular-dependency resolution held on a
 
 ## Phase 4 - Arc Analytics
 
+**Live:** [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app)
+
 **The problem:** There is no easy way to see what is happening on Arc Testnet at a glance, and no tool that explains trends in plain language.
 
-**What it does:** A live dashboard that syncs ERC-8183 events from Arc Testnet into Supabase, displays them as bar charts and an event feed, and lets you ask Claude to narrate the current state of the ecosystem in two sentences. It refreshes every 30 seconds and shows total jobs, volume, active escrows, and daily activity trends.
+**What it does:** A live dashboard that syncs the deployed AgenticCommerce (ERC-8183) events from Arc Testnet into Supabase, displays them as bar charts and an event feed, and lets you ask Claude to narrate the current state of the ecosystem in two sentences. It shows total jobs, USDC volume, active escrows, and daily activity trends across the whole shared contract, not just this app's jobs.
 
 **Key features:**
-- Sync button pulls the last 50,000 blocks of events from the chain in paginated chunks
+- Sync pulls the last ~50,000 blocks of events in paginated chunks, deduped before upsert; a Vercel Cron re-syncs daily and `POST /api/sync` triggers it on demand
+- Event signatures are taken from the verified onchain contract (a wrong signature changes the log topic and silently returns nothing)
 - Bar chart shows daily job creation, completion, and rejection counts
 - Live event feed shows the most recent onchain activity with block numbers and transaction links
-- Claude narration button generates a headline and two-sentence summary of current ecosystem health
+- Claude narration generates a headline and two-sentence summary of current ecosystem health
 
 **Run locally:**
 
@@ -170,10 +180,12 @@ Run `analytics/supabase/schema.sql` in your Supabase SQL editor first to create 
 
 | Contract | Address |
 |---|---|
-| ERC-8183 Jobs | `0x0747EEf0706327138c69792bF28Cd525089e4583` |
+| ERC-8183 Jobs (AgenticCommerce proxy) | `0x0747EEf0706327138c69792bF28Cd525089e4583` |
+| ERC-8183 implementation | `0xa316fd02827242d537f84730f8a37d0ba5fd351a` |
 | ERC-8004 Reputation | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
 | ERC-8004 Validation | `0x8004Cb1BF31DAf7788923b405b754f57acEB4272` |
 | USDC | `0x3600000000000000000000000000000000000000` |
+| Multi-Evaluator (Phase 3) | see the Phase 3 table above |
 
 ---
 
