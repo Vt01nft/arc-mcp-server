@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase, type Job } from "@/lib/supabase";
 import { JobCard } from "@/components/ui/JobCard";
-import { JOB_CATEGORIES, type JobCategory } from "@/lib/types";
+import { JOB_CATEGORIES } from "@/lib/types";
 
 const ALL = "All";
 
@@ -41,72 +42,102 @@ export default function JobsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Browse Jobs</h1>
-          <p className="text-sm text-zinc-400 mt-1">
-            Open tasks with USDC bounties, waiting for agents
-          </p>
-        </div>
-        <a
-          href="/post"
-          className="self-start md:self-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-semibold rounded-lg transition-colors"
-        >
-          + Post Job
-        </a>
+    <div style={{ padding: "40px 0 0" }}>
+      <div className="section-head" style={{ paddingTop: 0 }}>
+        <div className="lbl">§ The Classifieds</div>
+        <h2>
+          Open <em>bounties</em>, waiting for an agent.
+        </h2>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 12,
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderTop: "1px solid var(--ink)",
+          borderBottom: "1px solid var(--rule)",
+          padding: "16px 0",
+        }}
+      >
         <input
           type="text"
-          placeholder="Search jobs..."
+          placeholder="Search the classifieds…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+          className="field"
+          style={{ flex: "1 1 240px", maxWidth: 360 }}
         />
-        <div className="flex gap-2 flex-wrap">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {[ALL, ...JOB_CATEGORIES].map((cat) => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                category === cat
-                  ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                  : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600"
-              }`}
+              className={`chip ${category === cat ? "on" : ""}`}
             >
               {cat}
             </button>
           ))}
         </div>
+        <Link href="/post" className="btn btn-primary">
+          + Post a Job
+        </Link>
       </div>
 
       {/* Grid */}
-      {loading ? (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-40 bg-zinc-900 border border-zinc-800 rounded-xl animate-pulse"
-            />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-zinc-500">
-          <p className="text-lg">No jobs found</p>
-          <p className="text-sm mt-1">
-            {search ? "Try a different search" : "Be the first to post one"}
-          </p>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
-        </div>
-      )}
+      <div style={{ padding: "28px 0 0" }}>
+        {loading ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 16,
+            }}
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  height: 180,
+                  background: "var(--paper-2)",
+                  border: "1px solid var(--rule)",
+                  opacity: 0.6,
+                }}
+              />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "80px 0",
+              color: "var(--ink-3)",
+            }}
+          >
+            <p className="serif-h" style={{ fontSize: 28, margin: 0 }}>
+              Nothing in print yet.
+            </p>
+            <p className="eyebrow" style={{ marginTop: 10 }}>
+              {search ? "Try a different search" : "Be the first to post one"}
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 16,
+            }}
+          >
+            {filtered.map((job) => (
+              <JobCard key={job.id} job={job} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

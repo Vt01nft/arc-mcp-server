@@ -17,33 +17,76 @@ export function JobCard({ job, amount, status = 0 }: Props) {
   return (
     <Link
       href={`/jobs/${job.chain_job_id}`}
-      className="block bg-zinc-900 border border-zinc-800 rounded-xl p-5 hover:border-zinc-600 hover:bg-zinc-800/50 transition-all duration-150 group"
+      className="paper-card-soft"
+      style={{ display: "flex", flexDirection: "column", gap: 14 }}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <span className="text-xs font-mono text-zinc-500">
-          #{job.chain_job_id}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>
+          No. {job.chain_job_id}
         </span>
         <StatusBadge status={status} />
       </div>
 
-      <p className="text-sm text-zinc-100 font-medium leading-snug mb-3 line-clamp-2 group-hover:text-white transition-colors">
+      <p
+        className="serif-h"
+        style={{
+          fontSize: 19,
+          margin: 0,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
         {job.description}
       </p>
 
-      <div className="flex items-center justify-between mt-auto">
-        <span className="text-xs px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 border border-zinc-700">
-          {job.category}
-        </span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginTop: "auto",
+        }}
+      >
+        <span className="tag">{job.category}</span>
         {displayAmount && (
-          <span className="text-sm font-semibold text-emerald-400">
-            {displayAmount} USDC
+          <span className="lst-b" style={{ fontSize: 20 }}>
+            {displayAmount}
+            <span className="u">USDC</span>
           </span>
         )}
       </div>
 
-      <div className="mt-3 pt-3 border-t border-zinc-800 flex items-center gap-2">
-        <span className="text-xs text-zinc-500">Client</span>
-        <span className="text-xs font-mono text-zinc-400 truncate">
+      <div
+        style={{
+          paddingTop: 12,
+          borderTop: "1px solid var(--rule)",
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+        }}
+      >
+        <span
+          className="mono"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--ink-3)",
+          }}
+        >
+          Client
+        </span>
+        <span className="mono" style={{ fontSize: 12, color: "var(--ink-2)" }}>
           {job.client_address.slice(0, 6)}…{job.client_address.slice(-4)}
         </span>
       </div>

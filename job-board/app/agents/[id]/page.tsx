@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { publicClient } from "@/lib/viem";
 import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8004_REPUTATION_ABI } from "@/contracts/abis";
@@ -56,32 +57,71 @@ export default function AgentProfilePage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 max-w-2xl mx-auto">
-        <div className="h-32 bg-zinc-900 border border-zinc-800 rounded-xl animate-pulse" />
-        <div className="h-64 bg-zinc-900 border border-zinc-800 rounded-xl animate-pulse" />
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 0 0" }}>
+        <div
+          style={{
+            height: 140,
+            background: "var(--paper-2)",
+            border: "1px solid var(--rule)",
+            marginBottom: 16,
+          }}
+        />
+        <div
+          style={{
+            height: 240,
+            background: "var(--paper-2)",
+            border: "1px solid var(--rule)",
+          }}
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
-      <a href="/jobs" className="text-sm text-zinc-400 hover:text-white transition-colors">
+    <div
+      style={{
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "40px 0 0",
+        display: "flex",
+        flexDirection: "column",
+        gap: 28,
+      }}
+    >
+      <Link href="/jobs" className="eyebrow" style={{ width: "fit-content" }}>
         ← Browse Jobs
-      </a>
+      </Link>
 
       {/* Agent card */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="paper-card">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 24,
+            paddingBottom: 20,
+            borderBottom: "1px solid var(--rule)",
+          }}
+        >
           <div>
-            <p className="text-xs text-zinc-500 mb-1">Agent ID</p>
-            <h1 className="text-2xl font-bold text-white font-mono">#{agentId}</h1>
+            <p className="eyebrow" style={{ marginBottom: 8 }}>
+              Agent ID
+            </p>
+            <h1 className="serif-h" style={{ fontSize: 40, margin: 0 }}>
+              No. {agentId}
+            </h1>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-zinc-500 mb-1">Reputation Score</p>
+          <div style={{ textAlign: "right" }}>
+            <p className="eyebrow" style={{ marginBottom: 8 }}>
+              Reputation Score
+            </p>
             <p
-              className={`text-3xl font-bold ${
-                score >= 0 ? "text-emerald-400" : "text-red-400"
-              }`}
+              className="lst-b"
+              style={{
+                fontSize: 44,
+                color: score >= 0 ? "var(--good)" : "var(--bad)",
+              }}
             >
               {score >= 0 ? "+" : ""}
               {score.toFixed(1)}
@@ -90,43 +130,56 @@ export default function AgentProfilePage() {
         </div>
 
         {reputation && (
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 24,
+              paddingTop: 20,
+            }}
+          >
             <div>
-              <p className="text-xs text-zinc-500">Total Score</p>
-              <p className="text-sm font-semibold text-zinc-200">
+              <p className="eyebrow" style={{ marginBottom: 6 }}>
+                Total Score
+              </p>
+              <p className="serif-h" style={{ fontSize: 20, margin: 0 }}>
                 {reputation.totalScore.toString()}
               </p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Feedback Events</p>
-              <p className="text-sm font-semibold text-zinc-200">
+              <p className="eyebrow" style={{ marginBottom: 6 }}>
+                Feedback Events
+              </p>
+              <p className="serif-h" style={{ fontSize: 20, margin: 0 }}>
                 {reputation.eventCount.toString()}
               </p>
             </div>
           </div>
         )}
 
-        <div className="mt-4">
+        <div style={{ marginTop: 20 }}>
           <a
             href={`https://testnet.arcscan.app/address/${ADDRESSES.ERC8004_REPUTATION}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="eyebrow"
           >
-            View on ArcScan →
+            View on ArcScan ↗
           </a>
         </div>
       </div>
 
-      {/* Job history placeholder */}
+      {/* Job history */}
       <div>
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-          Recent Jobs
+        <h2 className="eyebrow accent" style={{ marginBottom: 16 }}>
+          § Recent Jobs
         </h2>
         {jobs.length === 0 ? (
-          <p className="text-sm text-zinc-500">No job history found.</p>
+          <p className="eyebrow" style={{ textTransform: "none", letterSpacing: 0 }}>
+            No job history found.
+          </p>
         ) : (
-          <div className="grid gap-4">
+          <div style={{ display: "grid", gap: 16 }}>
             {jobs.slice(0, 5).map((job) => (
               <JobCard key={job.id} job={job} />
             ))}

@@ -9,13 +9,14 @@ export const JOB_STATUS_LABEL: Record<JobStatus, string> = {
   5: "Expired",
 };
 
+/** Editorial status classes — see `.status-*` in globals.css */
 export const JOB_STATUS_COLOR: Record<JobStatus, string> = {
-  0: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  1: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-  2: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
-  3: "text-green-400 bg-green-400/10 border-green-400/20",
-  4: "text-red-400 bg-red-400/10 border-red-400/20",
-  5: "text-zinc-400 bg-zinc-400/10 border-zinc-400/20",
+  0: "status-open",
+  1: "status-funded",
+  2: "status-submitted",
+  3: "status-completed",
+  4: "status-rejected",
+  5: "status-expired",
 };
 
 export type ChainJob = {

@@ -50,20 +50,34 @@ export default function JobDetailPage() {
   const { writeContract, isPending: isTxPending } = useWriteContract();
 
   const [job, setJob] = useState<JobData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [evalResult, setEvalResult] = useState<EvaluateResponse | null>(null);
   const [deliverableInput, setDeliverableInput] = useState("");
   const [reason, setReason] = useState("");
 
+  // `loading` is derived: true until the fetch for the current `id` resolves.
+  // When `id` changes, loadedId is stale so this flips back to true on render —
+  // same UX as before, without a synchronous setState inside the effect.
+  const loading = loadedId !== id;
+
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
+    let cancelled = false;
     fetch(`/api/jobs/${id}`)
       .then((r) => r.json())
-      .then((data) => setJob(data.error ? null : data))
-      .catch(() => setJob(null))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) setJob(data.error ? null : data);
+      })
+      .catch(() => {
+        if (!cancelled) setJob(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedId(id);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   async function handleEvaluate() {
@@ -89,19 +103,41 @@ export default function JobDetailPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 max-w-3xl mx-auto">
-        <div className="h-6 w-40 bg-zinc-800 rounded animate-pulse" />
-        <div className="h-64 bg-zinc-900 border border-zinc-800 rounded-xl animate-pulse" />
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "48px 0 0" }}>
+        <div
+          style={{
+            height: 24,
+            width: 160,
+            background: "var(--paper-2)",
+            border: "1px solid var(--rule)",
+            marginBottom: 16,
+          }}
+        />
+        <div
+          style={{
+            height: 280,
+            background: "var(--paper-2)",
+            border: "1px solid var(--rule)",
+          }}
+        />
       </div>
     );
   }
 
   if (!job) {
     return (
-      <div className="text-center py-16 text-zinc-500">
-        <p className="text-lg mb-4">Job not found</p>
-        <Link href="/jobs" className="text-sm text-emerald-400 hover:underline">
-          Back to jobs
+      <div
+        style={{
+          textAlign: "center",
+          padding: "96px 0",
+          color: "var(--ink-3)",
+        }}
+      >
+        <p className="serif-h" style={{ fontSize: 32, margin: "0 0 16px" }}>
+          Job not found
+        </p>
+        <Link href="/jobs" className="link-underline">
+          Back to the classifieds
         </Link>
       </div>
     );
@@ -121,63 +157,105 @@ export default function JobDetailPage() {
   const activeEvaluation = evalResult ?? job.evaluation;
   const expiryDate = new Date(chain.expiry * 1000).toLocaleString();
 
+  const fmtAddr = (value: string) =>
+    value.startsWith("0x") ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
+
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto">
-      <Link href="/jobs" className="text-sm text-zinc-400 hover:text-white transition-colors w-fit">
+    <div
+      style={{
+        maxWidth: 760,
+        margin: "0 auto",
+        padding: "40px 0 0",
+        display: "flex",
+        flexDirection: "column",
+        gap: 28,
+      }}
+    >
+      <Link
+        href="/jobs"
+        className="eyebrow"
+        style={{ width: "fit-content" }}
+      >
         ← All Jobs
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 24,
+          borderBottom: "1px solid var(--ink)",
+          paddingBottom: 24,
+        }}
+      >
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-xs font-mono text-zinc-500">#{chain.id}</span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              marginBottom: 12,
+            }}
+          >
+            <span className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>
+              No. {chain.id}
+            </span>
             <StatusBadge status={chain.status} />
-            {metadata?.category && (
-              <span className="text-xs px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-400 border border-zinc-700">
-                {metadata.category}
-              </span>
-            )}
+            {metadata?.category && <span className="tag">{metadata.category}</span>}
           </div>
-          <h1 className="text-xl font-bold text-white leading-snug">
+          <h1 className="serif-h" style={{ fontSize: 34, margin: 0 }}>
             {metadata?.description ?? `Job #${chain.id}`}
           </h1>
         </div>
-        <div className="text-right shrink-0">
-          <p className="text-2xl font-bold text-emerald-400">{chain.amount}</p>
-          <p className="text-xs text-zinc-500 mt-1">USDC escrowed</p>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <p className="lst-b" style={{ fontSize: 34 }}>
+            {chain.amount}
+            <span className="u">USDC</span>
+          </p>
+          <p className="eyebrow" style={{ marginTop: 6 }}>
+            Escrowed
+          </p>
         </div>
       </div>
 
       {/* Parties */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 grid grid-cols-2 gap-4">
-        {[
-          { label: "Client", value: chain.client },
-          { label: "Provider", value: chain.provider },
-          { label: "Evaluator", value: chain.evaluator },
-          { label: "Expires", value: expiryDate },
-        ].map(({ label, value }) => (
-          <div key={label}>
-            <p className="text-xs text-zinc-500 mb-1">{label}</p>
-            <p className="text-sm font-mono text-zinc-200">
-              {value.startsWith("0x")
-                ? `${value.slice(0, 6)}…${value.slice(-4)}`
-                : value}
-            </p>
-          </div>
-        ))}
+      <div className="ledger">
+        <table>
+          <tbody>
+            {[
+              { label: "Client", value: chain.client },
+              { label: "Provider", value: chain.provider },
+              { label: "Evaluator", value: chain.evaluator },
+              { label: "Expires", value: expiryDate },
+            ].map(({ label, value }) => (
+              <tr key={label}>
+                <td className="role" style={{ width: 140 }}>
+                  {label}
+                </td>
+                <td className="addr">{fmtAddr(value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Provider: submit deliverable - visible when Funded (status 1) and connected as provider */}
       {chain.status === 1 && isProvider && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4">
-          <h2 className="text-sm font-semibold text-zinc-100">Submit Deliverable</h2>
+        <div
+          className="paper-card"
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
+        >
+          <h2 className="serif-h" style={{ fontSize: 22, margin: 0 }}>
+            Submit Deliverable
+          </h2>
           <textarea
             value={deliverableInput}
             onChange={(e) => setDeliverableInput(e.target.value)}
             rows={4}
             placeholder="Paste your deliverable content or an IPFS URI (ipfs://bafkrei…)"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 resize-none"
+            className="field"
           />
           <button
             disabled={!deliverableInput || isTxPending}
@@ -189,11 +267,12 @@ export default function JobDetailPage() {
                 args: [BigInt(chain.id), keccak256(toBytes(deliverableInput))],
               })
             }
-            className="self-start px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black text-sm font-semibold rounded-lg transition-colors"
+            className="btn btn-primary"
+            style={{ alignSelf: "flex-start" }}
           >
             {isTxPending ? "Submitting…" : "Submit to Chain"}
           </button>
-          <p className="text-xs text-zinc-600">
+          <p className="eyebrow" style={{ textTransform: "none", letterSpacing: 0 }}>
             Deliverable is hashed to bytes32 and stored on Arc Testnet.
           </p>
         </div>
@@ -201,10 +280,19 @@ export default function JobDetailPage() {
 
       {/* Submitted deliverable view */}
       {deliverable && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-zinc-300 mb-3">Submitted Deliverable</h2>
+        <div className="paper-card-soft">
+          <h2 className="eyebrow accent" style={{ marginBottom: 12 }}>
+            Submitted Deliverable
+          </h2>
           {deliverable.content_preview && (
-            <p className="text-sm text-zinc-300 leading-relaxed mb-3">
+            <p
+              style={{
+                fontSize: 15,
+                lineHeight: 1.6,
+                color: "var(--ink-2)",
+                marginBottom: 12,
+              }}
+            >
               {deliverable.content_preview}
             </p>
           )}
@@ -213,12 +301,16 @@ export default function JobDetailPage() {
               href={`https://ipfs.io/ipfs/${deliverable.ipfs_cid}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-emerald-400 hover:underline font-mono"
+              className="mono link-underline"
+              style={{ fontSize: 12 }}
             >
               ipfs://{deliverable.ipfs_cid}
             </a>
           )}
-          <p className="text-xs text-zinc-600 mt-2">
+          <p
+            className="eyebrow"
+            style={{ marginTop: 10, textTransform: "none", letterSpacing: 0 }}
+          >
             Submitted {new Date(deliverable.submitted_at).toLocaleString()}
           </p>
         </div>
@@ -226,20 +318,44 @@ export default function JobDetailPage() {
 
       {/* Evaluator panel - visible when Submitted (status 2) */}
       {chain.status === 2 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-zinc-100">Evaluator Panel</h2>
+        <div
+          className="paper-card"
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <h2 className="serif-h" style={{ fontSize: 22, margin: 0 }}>
+              Evaluator Panel
+            </h2>
             {isEvaluator && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <span className="status status-submitted">
+                <span className="pill" />
                 You are the evaluator
               </span>
             )}
           </div>
 
           {hasDeliverable && (
-            <div className="bg-zinc-800 rounded-lg px-3 py-2">
-              <p className="text-xs text-zinc-500 mb-1">On-chain deliverable hash</p>
-              <p className="text-xs font-mono text-zinc-300 break-all">{chain.deliverable}</p>
+            <div
+              className="mono"
+              style={{
+                background: "var(--paper-3)",
+                padding: "12px 14px",
+                fontSize: 12,
+                color: "var(--ink-2)",
+                wordBreak: "break-all",
+              }}
+            >
+              <div className="eyebrow" style={{ marginBottom: 6 }}>
+                On-chain deliverable hash
+              </div>
+              {chain.deliverable}
             </div>
           )}
 
@@ -248,7 +364,8 @@ export default function JobDetailPage() {
             <button
               onClick={handleEvaluate}
               disabled={evaluating || !hasDeliverable}
-              className="self-start px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
+              className="btn btn-ghost"
+              style={{ alignSelf: "flex-start" }}
             >
               {evaluating ? "Evaluating…" : "Evaluate with Claude"}
             </button>
@@ -256,22 +373,35 @@ export default function JobDetailPage() {
 
           {/* Claude result */}
           {activeEvaluation && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: 14 }}
+              >
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  className={`status ${
                     activeEvaluation.decision === "approve"
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : "bg-red-500/20 text-red-400 border border-red-500/30"
+                      ? "status-completed"
+                      : "status-rejected"
                   }`}
                 >
-                  Claude: {activeEvaluation.decision === "approve" ? "Approve" : "Reject"}
+                  <span className="pill" />
+                  Claude:{" "}
+                  {activeEvaluation.decision === "approve"
+                    ? "Approve"
+                    : "Reject"}
                 </span>
-                <span className="text-xs text-zinc-500">
-                  {Math.round((activeEvaluation.confidence ?? 0) * 100)}% confidence
+                <span className="eyebrow">
+                  {Math.round((activeEvaluation.confidence ?? 0) * 100)}%
+                  confidence
                 </span>
               </div>
-              <p className="text-sm text-zinc-300 leading-relaxed">
+              <p
+                style={{
+                  fontSize: 15,
+                  lineHeight: 1.6,
+                  color: "var(--ink-2)",
+                }}
+              >
                 {activeEvaluation.reasoning}
               </p>
             </div>
@@ -279,15 +409,23 @@ export default function JobDetailPage() {
 
           {/* Approve / Reject - evaluator only, after Claude evaluates */}
           {isEvaluator && activeEvaluation && (
-            <div className="flex flex-col gap-3 pt-3 border-t border-zinc-800">
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                paddingTop: 16,
+                borderTop: "1px solid var(--rule)",
+              }}
+            >
               <input
                 type="text"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Reason (optional)"
-                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+                className="field"
               />
-              <div className="flex gap-3">
+              <div style={{ display: "flex", gap: 12 }}>
                 <button
                   disabled={isTxPending}
                   onClick={() =>
@@ -301,7 +439,7 @@ export default function JobDetailPage() {
                       ],
                     })
                   }
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black text-sm font-semibold rounded-lg transition-colors"
+                  className="btn btn-primary"
                 >
                   {isTxPending ? "Signing…" : "Approve & Release USDC"}
                 </button>
@@ -318,7 +456,7 @@ export default function JobDetailPage() {
                       ],
                     })
                   }
-                  className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 disabled:opacity-40 border border-red-500/20 text-red-400 text-sm font-medium rounded-lg transition-colors"
+                  className="btn btn-ghost"
                 >
                   Reject & Refund
                 </button>
@@ -331,19 +469,24 @@ export default function JobDetailPage() {
       {/* Completed / Rejected state */}
       {(chain.status === 3 || chain.status === 4) && (
         <div
-          className={`rounded-xl p-5 border ${
-            chain.status === 3
-              ? "bg-emerald-500/10 border-emerald-500/20"
-              : "bg-red-500/10 border-red-500/20"
+          className={`notice ${
+            chain.status === 3 ? "notice-good" : "notice-bad"
           }`}
         >
-          <p className={`text-sm font-semibold ${chain.status === 3 ? "text-emerald-400" : "text-red-400"}`}>
+          <p style={{ margin: 0, fontWeight: 600 }}>
             {chain.status === 3
-              ? "Job completed - USDC released to provider"
-              : "Job rejected - USDC refunded to client"}
+              ? "Job completed — USDC released to provider"
+              : "Job rejected — USDC refunded to client"}
           </p>
           {job.evaluation && (
-            <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+            <p
+              style={{
+                marginTop: 8,
+                fontSize: 13,
+                lineHeight: 1.6,
+                color: "var(--ink-3)",
+              }}
+            >
               {job.evaluation.reasoning}
             </p>
           )}
@@ -354,9 +497,10 @@ export default function JobDetailPage() {
         href={`https://testnet.arcscan.app/address/${ADDRESSES.ERC8183_JOB}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors text-center"
+        className="eyebrow"
+        style={{ textAlign: "center", padding: "8px 0 40px" }}
       >
-        View ERC-8183 contract on ArcScan →
+        View ERC-8183 contract on ArcScan ↗
       </a>
     </div>
   );
