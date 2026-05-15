@@ -8,13 +8,17 @@ import { JOB_CATEGORIES } from "@/lib/types";
 
 const ALL = "All";
 
+// Supabase row, plus on-chain-only jobs discovered via /api/jobs/onchain.
+type Row = Job & { status?: number; onchain?: boolean };
+
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<string>(ALL);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchJobs() {
       setLoading(true);
       let query = supabase
@@ -27,11 +31,36 @@ export default function JobsPage() {
         query = query.eq("category", category);
       }
 
-      const { data, error } = await query;
-      if (!error && data) setJobs(data);
+      // On-chain jobs have no category, so only fold them into the
+      // unfiltered ("All") view. Supabase rows win on dedupe (richer
+      // metadata); on-chain-only jobs surface ones whose Supabase save
+      // failed (e.g. created before the schema existed).
+      const [sb, oc] = await Promise.all([
+        query,
+        category === ALL
+          ? fetch("/api/jobs/onchain")
+              .then((r) => r.json())
+              .catch(() => ({ jobs: [] }))
+          : Promise.resolve({ jobs: [] }),
+      ]);
+      if (cancelled) return;
+
+      const byId = new Map<number, Row>();
+      for (const j of (oc?.jobs ?? []) as Row[]) byId.set(j.chain_job_id, j);
+      if (!sb.error && sb.data) {
+        for (const j of sb.data as Row[]) byId.set(j.chain_job_id, j);
+      }
+
+      const merged = Array.from(byId.values()).sort(
+        (a, b) => (b.chain_job_id ?? 0) - (a.chain_job_id ?? 0)
+      );
+      setJobs(merged);
       setLoading(false);
     }
     fetchJobs();
+    return () => {
+      cancelled = true;
+    };
   }, [category]);
 
   const filtered = jobs.filter(
@@ -133,7 +162,7 @@ export default function JobsPage() {
             }}
           >
             {filtered.map((job) => (
-              <JobCard key={job.id} job={job} />
+              <JobCard key={job.id} job={job} status={job.status} />
             ))}
           </div>
         )}
