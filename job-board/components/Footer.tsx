@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArcLogo } from "./ArcLogo";
 
 const FAUCET_URL = "https://faucet.circle.com";
 const DOCS_URL = "https://arc.network";
@@ -8,7 +9,8 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="foot-cols">
-        <div className="foot-col">
+        <div className="foot-col foot-brand">
+          <ArcLogo size={44} />
           <div className="foot-mast">
             Arc Job <span className="ampersand">&amp;</span> Board
           </div>

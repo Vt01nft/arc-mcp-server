@@ -57,7 +57,7 @@ export default function JobDetailPage() {
   const [reason, setReason] = useState("");
 
   // `loading` is derived: true until the fetch for the current `id` resolves.
-  // When `id` changes, loadedId is stale so this flips back to true on render —
+  // When `id` changes, loadedId is stale so this flips back to true on render,
   // same UX as before, without a synchronous setState inside the effect.
   const loading = loadedId !== id;
 
@@ -475,8 +475,8 @@ export default function JobDetailPage() {
         >
           <p style={{ margin: 0, fontWeight: 600 }}>
             {chain.status === 3
-              ? "Job completed — USDC released to provider"
-              : "Job rejected — USDC refunded to client"}
+              ? "Job completed. USDC released to provider"
+              : "Job rejected. USDC refunded to client"}
           </p>
           {job.evaluation && (
             <p

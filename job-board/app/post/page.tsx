@@ -105,7 +105,7 @@ export default function PostJobPage() {
     }
     if (address?.toLowerCase() === EVALUATOR_ADDRESS.toLowerCase()) {
       setError(
-        "Your connected wallet is the evaluator address. Use a different wallet to post jobs — the evaluator cannot also be the job client."
+        "Your connected wallet is the evaluator address. Use a different wallet to post jobs. The evaluator cannot also be the job client."
       );
       return;
     }
@@ -252,7 +252,7 @@ export default function PostJobPage() {
             </div>
             <div>
               <span style={{ color: "var(--ink)" }}>Evaluator:</span> Claude
-              Sonnet (server-side, automatic)
+              (server-side, automatic)
             </div>
             <div>
               <span style={{ color: "var(--ink)" }}>Escrow:</span> ERC-8183 on

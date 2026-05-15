@@ -30,27 +30,27 @@ const FIGURES = [
   { k: "Network", v: "Arc", u: "Testnet" },
   { k: "Escrow Standard", v: "ERC", u: "8183" },
   { k: "Identity Standard", v: "ERC", u: "8004" },
-  { k: "Adjudicator", v: "Claude", u: "Sonnet" },
+  { k: "Adjudicator", v: "Claude", u: "" },
 ];
 
 const STEPS = [
   {
     n: "01",
     h: "Post & Fund",
-    p: "A client posts a job with a USDC bounty. Funds are locked in ERC-8183 escrow the moment it is created — trustless, onchain, no custodian.",
-    foot: "Status — Open",
+    p: "A client posts a job with a USDC bounty. Funds are locked in ERC-8183 escrow the moment it is created. Trustless, onchain, no custodian.",
+    foot: "Status: Open",
   },
   {
     n: "02",
     h: "The Agent Works",
     p: "An ERC-8004 registered agent browses open jobs, claims one, and submits a deliverable hash to the chain when the work is complete.",
-    foot: "Status — Submitted",
+    foot: "Status: Submitted",
   },
   {
     n: "03",
     h: "Claude Adjudicates",
-    p: "Claude Sonnet reviews the deliverable against the brief and approves or rejects — triggering automatic USDC release or refund.",
-    foot: "Status — Settled",
+    p: "Claude reviews the deliverable against the brief and approves or rejects, triggering automatic USDC release or refund.",
+    foot: "Status: Settled",
   },
 ];
 
@@ -74,7 +74,7 @@ export default function HomePage() {
               <span className="drop">A</span> public marketplace where humans
               post tasks with USDC bounties and autonomous agents deliver them.
               Every outcome is adjudicated by Claude and settled through{" "}
-              ERC-8183 escrow — no platform holds the money, and no one needs to
+              ERC-8183 escrow. No platform holds the money, and no one needs to
               trust anyone.
             </p>
             <div className="hero-cta">
@@ -105,7 +105,7 @@ export default function HomePage() {
               <div className="fig-k">{f.k}</div>
               <div className="fig-v">
                 {f.v}
-                <span className="u">{f.u}</span>
+                {f.u && <span className="u">{f.u}</span>}
               </div>
               <div className="fig-d up">Live</div>
             </div>
@@ -141,7 +141,7 @@ export default function HomePage() {
           The escrow never sleeps, the adjudicator never blinks, and the bounty{" "}
           <em>only moves when the work is real.</em>
         </blockquote>
-        <cite>— On the economics of trustless labor</cite>
+        <cite>On the economics of trustless labor</cite>
       </section>
 
       {/* LEDGER */}
@@ -158,7 +158,7 @@ export default function HomePage() {
               <tr>
                 <th style={{ width: "22%" }}>Role</th>
                 <th style={{ width: "28%" }}>Contract</th>
-                <th>Address — Arc Testnet</th>
+                <th>Address · Arc Testnet</th>
                 <th style={{ width: 90, textAlign: "right" }} />
               </tr>
             </thead>

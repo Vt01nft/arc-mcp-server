@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Arc Job Board — "The Onchain Quarterly" editorial design system
+   Arc Job Board - "The Onchain Quarterly" editorial design system
    Ported from the approved design. Fonts are supplied by next/font in
    layout.tsx via CSS variables (--font-*); we alias them below.
    ────────────────────────────────────────────────────────────────────────── */
@@ -16,9 +16,9 @@
   --ink-2: #1c1812;
   --ink-3: #3e3a32;
   --ink-4: #6a6458;
-  --accent: #c45028; /* terracotta */
-  --accent-2: #8f3a1c;
-  --accent-soft: rgba(196, 80, 40, 0.08);
+  --accent: #1e3a8a; /* dark blue */
+  --accent-2: #172554;
+  --accent-soft: rgba(30, 58, 138, 0.08);
   --good: #2f6b3d;
   --bad: #a23a2a;
 
@@ -60,7 +60,7 @@ body {
 body {
   min-height: 100vh;
   background-image:
-    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(196, 80, 40, 0.04), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(30, 58, 138, 0.045), transparent 70%),
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/><feColorMatrix values='0 0 0 0 .05  0 0 0 0 .04  0 0 0 0 .03  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
@@ -105,10 +105,15 @@ a {
 }
 
 .wrap {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 40px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 clamp(24px, 4vw, 88px);
   position: relative;
+}
+main {
+  display: block;
+  padding-bottom: 24px;
 }
 .rule {
   height: 1px;
@@ -136,7 +141,7 @@ a {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
-  padding: 14px 0 12px;
+  padding: 20px 0 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -157,11 +162,11 @@ a {
   font-weight: 600;
 }
 .masthead {
-  padding: 6px 0 18px;
+  padding: 14px 0 26px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 24px;
+  gap: 32px;
 }
 .mast-l,
 .mast-r {
@@ -209,12 +214,12 @@ a {
 
 /* HERO */
 .hero {
-  padding: 48px 0 56px;
+  padding: 72px 0 88px;
 }
 .hero-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 64px;
+  gap: 80px;
   align-items: end;
 }
 .kicker {
@@ -346,14 +351,14 @@ h1.hero-title em {
 
 /* HERO FIGURES */
 .figures {
-  margin-top: 48px;
+  margin-top: 64px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid var(--ink);
   border-bottom: 1px solid var(--ink);
 }
 .fig {
-  padding: 20px 24px;
+  padding: 28px 30px;
   border-right: 1px solid var(--rule);
   position: relative;
 }
@@ -397,11 +402,12 @@ h1.hero-title em {
 
 /* SECTION HEAD */
 .section-head {
-  padding: 80px 0 24px;
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 48px;
-  align-items: end;
+  padding: 52px 0 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
 }
 .section-head .lbl {
   font-family: var(--mono);
@@ -414,7 +420,7 @@ h1.hero-title em {
   gap: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--ink);
-  max-width: max-content;
+  margin: 0 auto;
 }
 .section-head h2 {
   font-family: var(--fraunces);
@@ -424,6 +430,7 @@ h1.hero-title em {
   letter-spacing: -0.03em;
   margin: 0;
   color: var(--ink);
+  max-width: 22ch;
 }
 .section-head h2 em {
   font-style: normal;
@@ -440,7 +447,7 @@ h1.hero-title em {
   border-bottom: 1px solid var(--ink);
 }
 .col {
-  padding: 28px 28px 30px;
+  padding: 38px 36px 42px;
   border-right: 1px solid var(--rule);
   position: relative;
 }
@@ -510,7 +517,7 @@ h1.hero-title em {
 .lst {
   display: grid;
   grid-template-columns: 36px 1fr 140px 100px 110px;
-  padding: 18px 0;
+  padding: 24px 0;
   border-bottom: 1px solid var(--rule);
   align-items: start;
   transition: 0.15s;
@@ -690,8 +697,10 @@ h1.hero-title em {
   margin-top: 0;
   border-top: 1px solid var(--ink);
   border-bottom: 1px solid var(--ink);
+  overflow-x: auto;
 }
 .ledger table {
+  min-width: 520px;
   width: 100%;
   border-collapse: collapse;
   font-family: var(--mono);
@@ -708,7 +717,7 @@ h1.hero-title em {
   border-bottom: 1px solid var(--ink);
 }
 .ledger td {
-  padding: 18px 0;
+  padding: 22px 0;
   border-bottom: 1px solid var(--rule);
   color: var(--ink-2);
   vertical-align: top;
@@ -761,8 +770,8 @@ h1.hero-title em {
 
 /* PULL QUOTE */
 .pq {
-  margin: 80px 0 0;
-  padding: 60px 0;
+  margin: 104px 0 0;
+  padding: 76px 0;
   border-top: 3px double var(--ink);
   border-bottom: 3px double var(--ink);
   text-align: center;
@@ -796,22 +805,11 @@ h1.hero-title em {
 
 /* END CTA */
 .endcta {
-  margin-top: 96px;
-  padding: 64px 0;
+  margin-top: 112px;
+  padding: 84px 0;
   text-align: center;
   border-top: 1px solid var(--ink);
   position: relative;
-}
-.endcta::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: -1px;
-  transform: translateX(-50%);
-  width: 14px;
-  height: 14px;
-  background: var(--accent);
-  border-radius: 50%;
 }
 .endcta h3 {
   font-family: var(--fraunces);
@@ -851,6 +849,19 @@ h1.hero-title em {
   display: grid;
   grid-template-columns: 1.6fr 1fr 1fr;
   gap: 48px;
+  align-items: start;
+}
+.foot-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+.foot-brand .foot-mast {
+  margin-top: 14px;
+}
+.foot-brand .foot-tag {
+  max-width: 38ch;
 }
 .foot-col h5 {
   font-family: var(--mono);
@@ -1081,8 +1092,11 @@ textarea.field {
 }
 
 @media (max-width: 980px) {
-  .wrap {
-    padding: 0 20px;
+  .hero {
+    padding: 48px 0 56px;
+  }
+  .section-head {
+    padding: 40px 0 20px;
   }
   .hero-grid {
     grid-template-columns: 1fr;
@@ -1125,12 +1139,93 @@ textarea.field {
   }
   .masthead {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 14px;
     text-align: center;
   }
   .mast-l,
   .mast-r {
     justify-content: center;
     flex-wrap: wrap;
+  }
+  .masthead-strip {
+    justify-content: center;
+    text-align: center;
+    gap: 14px;
+  }
+  .masthead-strip > span {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  h1.hero-title {
+    font-size: 42px;
+  }
+  .hero {
+    padding: 36px 0 44px;
+  }
+  .hero-cta {
+    flex-wrap: wrap;
+  }
+  .figures {
+    grid-template-columns: 1fr 1fr;
+  }
+  .fig {
+    padding: 20px 18px;
+  }
+  .fig-v {
+    font-size: 26px;
+  }
+  .section-head {
+    padding: 32px 0 16px;
+  }
+  .section-head h2 {
+    font-size: 30px;
+  }
+  .col {
+    padding: 28px 24px 30px;
+  }
+  .pq {
+    padding: 52px 0;
+    margin-top: 72px;
+  }
+  .pq blockquote {
+    font-size: 22px;
+  }
+  .endcta {
+    margin-top: 80px;
+    padding: 56px 0;
+  }
+  .endcta h3 {
+    font-size: 30px;
+  }
+  .endcta-row {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .foot-cols {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    text-align: center;
+  }
+  .foot-col {
+    align-items: center;
+  }
+  .foot-col h5,
+  .foot-col a {
+    text-align: center;
+  }
+  .foot-brand {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .foot-bot {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+    justify-content: center;
+  }
+  .mast-title {
+    font-size: 30px;
   }
 }

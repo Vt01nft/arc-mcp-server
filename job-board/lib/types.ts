@@ -9,7 +9,7 @@ export const JOB_STATUS_LABEL: Record<JobStatus, string> = {
   5: "Expired",
 };
 
-/** Editorial status classes — see `.status-*` in globals.css */
+/** Editorial status classes - see `.status-*` in globals.css */
 export const JOB_STATUS_COLOR: Record<JobStatus, string> = {
   0: "status-open",
   1: "status-funded",
