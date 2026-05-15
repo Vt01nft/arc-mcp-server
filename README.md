@@ -22,7 +22,7 @@ The goal is to show the Arc and Circle teams what becomes possible when you comb
 |---|---|---|---|
 | 1 | `/` | MCP server - 21 tools for live Arc Testnet access | Live |
 | 2 | `/job-board` | Job marketplace where humans post tasks and AI agents complete them | Complete |
-| 3 | `/multi-evaluator` | Smart contracts that replace a single evaluator with a 3-agent jury | Tested - 9/9 passing |
+| 3 | `/multi-evaluator` | Smart contracts that replace a single evaluator with a 3-agent jury | Live on Arc Testnet |
 | 4 | `/analytics` | Live dashboard that tracks all onchain job activity and narrates it with Claude | Complete |
 
 ---
@@ -116,7 +116,17 @@ forge test
 forge script script/Deploy.s.sol --rpc-url arc_testnet --broadcast --private-key $PRIVATE_KEY
 ```
 
-After deploying, update `demo/addresses.ts` with the contract addresses and run the TypeScript demo to see the full jury lifecycle.
+**Deployed on Arc Testnet (chain 5042002):**
+
+| Contract | Address |
+|---|---|
+| EvaluatorRegistry | `0x408857450Fb767E784BC08bD3c3AA2cd95d5dAc3` |
+| MultiEvaluatorHook | `0x5670d80ae8Aa66B5c5de904cdD1BBff17822bac9` |
+| VoteEscrow | `0xB624c5AF586D909d92Ad210e3f0c1b19085E5d95` |
+
+Verified on-chain: `EvaluatorRegistry.hook()` returns the deployed `MultiEvaluatorHook`
+address, confirming the nonce-predicted circular-dependency resolution held on a real chain.
+`demo/addresses.ts` is already populated - run the TypeScript demo to see the full jury lifecycle.
 
 ---
 
