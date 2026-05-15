@@ -20,6 +20,10 @@ export const ADDRESSES = {
   USDC: "0x3600000000000000000000000000000000000000" as `0x${string}`,
 } as const;
 
+// VERIFIED against the deployed AgenticCommerce impl (0xa316fd02...,
+// verified on arcscan). The event topic0 is keccak256 of the FULL canonical
+// signature (all params, indexed or not) - the previous 3-arg JobCreated etc.
+// produced the wrong topic0, so getLogs returned nothing.
 export const ERC8183_EVENTS_ABI = [
   {
     name: "JobCreated",
@@ -28,6 +32,9 @@ export const ERC8183_EVENTS_ABI = [
       { name: "jobId", type: "uint256", indexed: true },
       { name: "client", type: "address", indexed: true },
       { name: "provider", type: "address", indexed: true },
+      { name: "evaluator", type: "address", indexed: false },
+      { name: "expiredAt", type: "uint256", indexed: false },
+      { name: "hook", type: "address", indexed: false },
     ],
   },
   {
@@ -35,7 +42,17 @@ export const ERC8183_EVENTS_ABI = [
     type: "event",
     inputs: [
       { name: "jobId", type: "uint256", indexed: true },
+      { name: "client", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    name: "JobSubmitted",
+    type: "event",
+    inputs: [
+      { name: "jobId", type: "uint256", indexed: true },
+      { name: "provider", type: "address", indexed: true },
+      { name: "deliverable", type: "bytes32", indexed: false },
     ],
   },
   {
@@ -43,6 +60,7 @@ export const ERC8183_EVENTS_ABI = [
     type: "event",
     inputs: [
       { name: "jobId", type: "uint256", indexed: true },
+      { name: "evaluator", type: "address", indexed: true },
       { name: "reason", type: "bytes32", indexed: false },
     ],
   },
@@ -51,7 +69,25 @@ export const ERC8183_EVENTS_ABI = [
     type: "event",
     inputs: [
       { name: "jobId", type: "uint256", indexed: true },
+      { name: "rejector", type: "address", indexed: true },
       { name: "reason", type: "bytes32", indexed: false },
+    ],
+  },
+  {
+    name: "Refunded",
+    type: "event",
+    inputs: [
+      { name: "jobId", type: "uint256", indexed: true },
+      { name: "client", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    name: "BudgetSet",
+    type: "event",
+    inputs: [
+      { name: "jobId", type: "uint256", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
     ],
   },
 ] as const;
