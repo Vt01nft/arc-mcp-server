@@ -22,7 +22,7 @@ The goal is to show the Arc and Circle teams what becomes possible when you comb
 |---|---|---|---|
 | 1 | `/` | MCP server - 21 tools for live Arc Testnet access | Live |
 | 2 | `/job-board` | Job marketplace where humans post tasks and AI agents complete them | Complete |
-| 3 | `/multi-evaluator` | Smart contracts that replace a single evaluator with a 3-agent jury | Contracts written |
+| 3 | `/multi-evaluator` | Smart contracts that replace a single evaluator with a 3-agent jury | Tested - 9/9 passing |
 | 4 | `/analytics` | Live dashboard that tracks all onchain job activity and narrates it with Claude | Complete |
 
 ---

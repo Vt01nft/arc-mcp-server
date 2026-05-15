@@ -17,6 +17,8 @@ cache/
 **/cache/
 broadcast/
 **/broadcast/
+# forge-std and other deps — installed via `forge install` (see README)
+multi-evaluator/lib/
 
 # Misc
 .DS_Store
@@ -28,3 +30,5 @@ tsconfig.tsbuildinfo
 extracted/
 .claude/
 *.zip
+
+.vercel

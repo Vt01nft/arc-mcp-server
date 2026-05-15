@@ -20,8 +20,11 @@ contract MultiEvaluatorHookTest is Test {
     uint256 constant JOB_VALUE = 100 ether; // 100 USDC
 
     function setUp() public {
-        registry = new EvaluatorRegistry(deployer); // deployer as hook placeholder
+        // Predict the hook's CREATE address (registry deploys at current nonce, hook at nonce+1)
+        address predictedHook = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
+        registry = new EvaluatorRegistry(predictedHook);
         hook = new MultiEvaluatorHook(address(registry));
+        require(address(hook) == predictedHook, "Hook address mismatch");
         voteEscrow = new VoteEscrow();
 
         // Fund test accounts with native USDC
