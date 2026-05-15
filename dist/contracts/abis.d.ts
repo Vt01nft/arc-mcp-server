@@ -92,11 +92,11 @@ export declare const ERC8183_ABI: readonly [{
         readonly name: "evaluator";
         readonly type: "address";
     }, {
-        readonly name: "expiry";
+        readonly name: "expiredAt";
         readonly type: "uint256";
     }, {
         readonly name: "description";
-        readonly type: "bytes32";
+        readonly type: "string";
     }, {
         readonly name: "hook";
         readonly type: "address";
@@ -106,16 +106,34 @@ export declare const ERC8183_ABI: readonly [{
         readonly type: "uint256";
     }];
 }, {
-    readonly name: "fundJob";
+    readonly name: "setBudget";
     readonly type: "function";
-    readonly stateMutability: "payable";
+    readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
         readonly name: "jobId";
         readonly type: "uint256";
+    }, {
+        readonly name: "amount";
+        readonly type: "uint256";
+    }, {
+        readonly name: "optParams";
+        readonly type: "bytes";
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "submitDeliverable";
+    readonly name: "fund";
+    readonly type: "function";
+    readonly stateMutability: "nonpayable";
+    readonly inputs: readonly [{
+        readonly name: "jobId";
+        readonly type: "uint256";
+    }, {
+        readonly name: "optParams";
+        readonly type: "bytes";
+    }];
+    readonly outputs: readonly [];
+}, {
+    readonly name: "submit";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -124,10 +142,13 @@ export declare const ERC8183_ABI: readonly [{
     }, {
         readonly name: "deliverable";
         readonly type: "bytes32";
+    }, {
+        readonly name: "optParams";
+        readonly type: "bytes";
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "completeJob";
+    readonly name: "complete";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -136,10 +157,13 @@ export declare const ERC8183_ABI: readonly [{
     }, {
         readonly name: "reason";
         readonly type: "bytes32";
+    }, {
+        readonly name: "optParams";
+        readonly type: "bytes";
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "rejectJob";
+    readonly name: "reject";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -148,10 +172,13 @@ export declare const ERC8183_ABI: readonly [{
     }, {
         readonly name: "reason";
         readonly type: "bytes32";
+    }, {
+        readonly name: "optParams";
+        readonly type: "bytes";
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "refundJob";
+    readonly name: "claimRefund";
     readonly type: "function";
     readonly stateMutability: "nonpayable";
     readonly inputs: readonly [{
@@ -160,7 +187,7 @@ export declare const ERC8183_ABI: readonly [{
     }];
     readonly outputs: readonly [];
 }, {
-    readonly name: "jobs";
+    readonly name: "getJob";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [{
@@ -183,27 +210,24 @@ export declare const ERC8183_ABI: readonly [{
             readonly name: "evaluator";
             readonly type: "address";
         }, {
-            readonly name: "expiry";
+            readonly name: "description";
+            readonly type: "string";
+        }, {
+            readonly name: "budget";
             readonly type: "uint256";
         }, {
-            readonly name: "description";
-            readonly type: "bytes32";
-        }, {
-            readonly name: "amount";
+            readonly name: "expiredAt";
             readonly type: "uint256";
         }, {
             readonly name: "status";
             readonly type: "uint8";
-        }, {
-            readonly name: "deliverable";
-            readonly type: "bytes32";
         }, {
             readonly name: "hook";
             readonly type: "address";
         }];
     }];
 }, {
-    readonly name: "jobCount";
+    readonly name: "jobCounter";
     readonly type: "function";
     readonly stateMutability: "view";
     readonly inputs: readonly [];
@@ -226,6 +250,18 @@ export declare const ERC8183_ABI: readonly [{
         readonly name: "provider";
         readonly type: "address";
         readonly indexed: true;
+    }, {
+        readonly name: "evaluator";
+        readonly type: "address";
+        readonly indexed: false;
+    }, {
+        readonly name: "expiredAt";
+        readonly type: "uint256";
+        readonly indexed: false;
+    }, {
+        readonly name: "hook";
+        readonly type: "address";
+        readonly indexed: false;
     }];
 }, {
     readonly name: "JobFunded";
@@ -235,16 +271,24 @@ export declare const ERC8183_ABI: readonly [{
         readonly type: "uint256";
         readonly indexed: true;
     }, {
+        readonly name: "client";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
         readonly name: "amount";
         readonly type: "uint256";
         readonly indexed: false;
     }];
 }, {
-    readonly name: "DeliverableSubmitted";
+    readonly name: "JobSubmitted";
     readonly type: "event";
     readonly inputs: readonly [{
         readonly name: "jobId";
         readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "provider";
+        readonly type: "address";
         readonly indexed: true;
     }, {
         readonly name: "deliverable";
@@ -259,6 +303,10 @@ export declare const ERC8183_ABI: readonly [{
         readonly type: "uint256";
         readonly indexed: true;
     }, {
+        readonly name: "evaluator";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
         readonly name: "reason";
         readonly type: "bytes32";
         readonly indexed: false;
@@ -271,8 +319,40 @@ export declare const ERC8183_ABI: readonly [{
         readonly type: "uint256";
         readonly indexed: true;
     }, {
+        readonly name: "rejector";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
         readonly name: "reason";
         readonly type: "bytes32";
+        readonly indexed: false;
+    }];
+}, {
+    readonly name: "Refunded";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly name: "jobId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "client";
+        readonly type: "address";
+        readonly indexed: true;
+    }, {
+        readonly name: "amount";
+        readonly type: "uint256";
+        readonly indexed: false;
+    }];
+}, {
+    readonly name: "BudgetSet";
+    readonly type: "event";
+    readonly inputs: readonly [{
+        readonly name: "jobId";
+        readonly type: "uint256";
+        readonly indexed: true;
+    }, {
+        readonly name: "amount";
+        readonly type: "uint256";
         readonly indexed: false;
     }];
 }];

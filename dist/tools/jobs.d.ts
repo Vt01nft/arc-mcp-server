@@ -22,12 +22,12 @@ export declare function arcCreateJob(args: z.infer<typeof createJobSchema>): Pro
     success: boolean;
     hash: `0x${string}`;
     explorer: string;
+    jobId: string | null;
     job: {
         client: `0x${string}`;
         provider: `0x${string}`;
         evaluator: `0x${string}`;
         description: string;
-        description_hash: `0x${string}`;
         expiry: string;
         status: string;
         hook: string;
@@ -49,10 +49,9 @@ export declare function arcGetJob(args: z.infer<typeof getJobSchema>): Promise<{
     evaluator: `0x${string}`;
     status: string;
     status_code: number;
-    amount: string;
-    amount_raw: string;
-    description_hash: `0x${string}`;
-    deliverable_hash: `0x${string}` | null;
+    budget: string;
+    budget_raw: string;
+    description: string;
     expiry: string;
     expired: boolean;
     hook: `0x${string}` | null;
@@ -60,11 +59,12 @@ export declare function arcGetJob(args: z.infer<typeof getJobSchema>): Promise<{
 }>;
 export declare function arcGetJobCount(): Promise<{
     total_jobs: number;
+    note: string;
     latest_block: string;
     contract: `0x${string}`;
     explorer: string;
 }>;
-export declare const fundJobSchema: z.ZodObject<{
+export declare const setBudgetSchema: z.ZodObject<{
     jobId: z.ZodNumber;
     amount: z.ZodString;
 }, "strip", z.ZodTypeAny, {
@@ -74,9 +74,25 @@ export declare const fundJobSchema: z.ZodObject<{
     amount: string;
     jobId: number;
 }>;
+export declare function arcSetBudget(args: z.infer<typeof setBudgetSchema>): Promise<{
+    success: boolean;
+    hash: `0x${string}`;
+    explorer: string;
+    jobId: number;
+    budget: string;
+    note: string;
+}>;
+export declare const fundJobSchema: z.ZodObject<{
+    jobId: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    jobId: number;
+}, {
+    jobId: number;
+}>;
 export declare function arcFundJob(args: z.infer<typeof fundJobSchema>): Promise<{
     success: boolean;
     hash: `0x${string}`;
+    approve_tx: `0x${string}`;
     explorer: string;
     jobId: number;
     amount_escrowed: string;
@@ -102,7 +118,6 @@ export declare function arcSubmitDeliverable(args: z.infer<typeof submitDelivera
     deliverable_hash: `0x${string}`;
     status: string;
     next_step: string;
-    note: string;
 }>;
 export declare const completeJobSchema: z.ZodObject<{
     jobId: z.ZodNumber;

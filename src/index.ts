@@ -53,6 +53,8 @@ import {
   arcGetJob,
   getJobSchema,
   arcGetJobCount,
+  arcSetBudget,
+  setBudgetSchema,
   arcFundJob,
   fundJobSchema,
   arcSubmitDeliverable,
@@ -143,13 +145,19 @@ const TOOLS = [
   {
     name: "arc_create_job",
     description:
-      "Create a new ERC-8183 job on Arc Testnet. Defines provider, evaluator, description, and expiry. Does NOT lock USDC yet - call arc_fund_job next. Requires PRIVATE_KEY.",
+      "Create a new ERC-8183 job on Arc Testnet. Defines provider, evaluator, description (stored as a string), and expiry. Job opens with budget 0; the provider then calls arc_set_budget. Requires PRIVATE_KEY.",
     inputSchema: toJsonSchema(createJobSchema),
+  },
+  {
+    name: "arc_set_budget",
+    description:
+      "Set the USDC budget (price) for an Open ERC-8183 job. Caller must be the job's provider. The client then calls arc_fund_job. Requires PRIVATE_KEY.",
+    inputSchema: toJsonSchema(setBudgetSchema),
   },
   {
     name: "arc_fund_job",
     description:
-      "Fund an ERC-8183 job with USDC. USDC is locked in escrow until the evaluator completes or rejects the job. Requires PRIVATE_KEY. Job must be in Open state.",
+      "Fund an ERC-8183 job: approves USDC then calls fund(), which pulls the budget into escrow. Caller must be the job's client; budget must be set first. Requires PRIVATE_KEY.",
     inputSchema: toJsonSchema(fundJobSchema),
   },
   {
@@ -241,6 +249,7 @@ async function callTool(name: string, args: unknown): Promise<unknown> {
     case "arc_get_job_count":    return arcGetJobCount();
     case "arc_get_job":          return arcGetJob(getJobSchema.parse(args));
     case "arc_create_job":       return arcCreateJob(createJobSchema.parse(args));
+    case "arc_set_budget":       return arcSetBudget(setBudgetSchema.parse(args));
     case "arc_fund_job":         return arcFundJob(fundJobSchema.parse(args));
     case "arc_submit_deliverable": return arcSubmitDeliverable(submitDeliverableSchema.parse(args));
     case "arc_complete_job":     return arcCompleteJob(completeJobSchema.parse(args));

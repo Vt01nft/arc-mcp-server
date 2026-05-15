@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isAddress, keccak256, toHex, encodeAbiParameters, parseAbiParameters } from "viem";
+import { isAddress, keccak256, toHex, decodeEventLog } from "viem";
 import {
   getPublicClient,
   getWalletClient,
@@ -8,13 +8,20 @@ import {
   txLink,
 } from "../arc-client.js";
 import { ADDRESSES, USDC_DECIMALS } from "../contracts/addresses.js";
-import { ERC8183_ABI, JOB_STATUS } from "../contracts/abis.js";
+import { ERC8183_ABI, USDC_ABI, JOB_STATUS } from "../contracts/abis.js";
 
-// ── Helper: encode description as bytes32 ─────────────────────────────────────
+// Deployed contract is AgenticCommerce (ERC-8183) at
+// 0x0747EEf0706327138c69792bF28Cd525089e4583. Verified flow:
+//   createJob (client) -> setBudget (provider) -> approve+fund (client)
+//   -> submit (provider) -> complete | reject (evaluator)
+// Budget/USDC use the 6-decimal ERC-20 interface.
+
+const NO_OPT = "0x" as const;
+const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
+
+// deliverable / reason are bytes32 onchain; description is a plain string.
 function toBytes32(text: string): `0x${string}` {
-  // If it's already a hex bytes32, return as-is
   if (text.startsWith("0x") && text.length === 66) return text as `0x${string}`;
-  // Otherwise hash the text to bytes32
   return keccak256(toHex(text));
 }
 
@@ -22,23 +29,19 @@ function toBytes32(text: string): `0x${string}` {
 export const createJobSchema = z.object({
   provider: z.string().describe("Address of the agent/person who will do the work"),
   evaluator: z.string().describe(
-    "Address of the evaluator who approves/rejects the deliverable. Can equal client address for self-evaluation."
+    "Address of the evaluator who approves/rejects the deliverable. May equal the client for self-evaluation."
   ),
-  description: z
-    .string()
-    .describe("Job description - will be hashed to bytes32 onchain"),
+  description: z.string().describe("Job description, stored onchain as a string"),
   expiryHours: z
     .number()
     .min(1)
     .max(720)
     .default(48)
-    .describe("Hours until job expires and USDC is auto-refunded (default: 48)"),
+    .describe("Hours until job expires and USDC can be refunded (default: 48)"),
   hook: z
     .string()
     .optional()
-    .describe(
-      "Optional hook contract address for custom job logic (reputation checks, bidding, etc). Leave empty for none."
-    ),
+    .describe("Optional hook contract address. Leave empty for none."),
 });
 
 export async function arcCreateJob(args: z.infer<typeof createJobSchema>) {
@@ -49,42 +52,54 @@ export async function arcCreateJob(args: z.infer<typeof createJobSchema>) {
   if (!isAddress(args.evaluator)) throw new Error(`Invalid evaluator: ${args.evaluator}`);
   if (args.hook && !isAddress(args.hook)) throw new Error(`Invalid hook: ${args.hook}`);
 
-  const expiry = BigInt(Math.floor(Date.now() / 1000) + args.expiryHours * 3600);
-  const descriptionHash = toBytes32(args.description);
-  const hookAddress = (args.hook ?? "0x0000000000000000000000000000000000000000") as `0x${string}`;
+  const expiredAt = BigInt(Math.floor(Date.now() / 1000) + args.expiryHours * 3600);
+  const hookAddress = (args.hook ?? ZERO) as `0x${string}`;
 
   const hash = await walletClient.writeContract({
     address: ADDRESSES.ERC8183_JOB,
     abi: ERC8183_ABI,
     functionName: "createJob",
-    args: [args.provider, args.evaluator, expiry, descriptionHash, hookAddress],
+    args: [args.provider, args.evaluator, expiredAt, args.description, hookAddress],
     account,
     chain: walletClient.chain,
   });
 
   const receipt = await client.waitForTransactionReceipt({ hash });
 
-  // Parse JobCreated event to get jobId
-  const jobCreatedLog = receipt.logs.find((log) =>
-    log.address.toLowerCase() === ADDRESSES.ERC8183_JOB.toLowerCase()
-  );
+  // Decode JobCreated to recover the jobId
+  let jobId: string | null = null;
+  for (const log of receipt.logs) {
+    try {
+      const decoded = decodeEventLog({
+        abi: ERC8183_ABI,
+        eventName: "JobCreated",
+        topics: log.topics,
+        data: log.data,
+      }) as { args: { jobId: bigint } };
+      jobId = decoded.args.jobId.toString();
+      break;
+    } catch {
+      /* not JobCreated */
+    }
+  }
 
   return {
     success: receipt.status === "success",
     hash,
     explorer: txLink(hash),
+    jobId,
     job: {
       client: account.address,
       provider: args.provider,
       evaluator: args.evaluator,
       description: args.description,
-      description_hash: descriptionHash,
-      expiry: new Date(Number(expiry) * 1000).toISOString(),
+      expiry: new Date(Number(expiredAt) * 1000).toISOString(),
       status: "Open",
       hook: args.hook ?? "none",
     },
-    next_step: "Fund the job with arc_fund_job using the jobId from the event log.",
-    note: "Job is now Open. No USDC is locked until funded. The provider cannot start until the job is Funded.",
+    next_step:
+      "Job is Open with budget 0. The provider calls arc_set_budget, then the client calls arc_fund_job.",
+    note: "No USDC is locked until the budget is set and the job is funded.",
   };
 }
 
@@ -99,13 +114,13 @@ export async function arcGetJob(args: z.infer<typeof getJobSchema>) {
   const job = await client.readContract({
     address: ADDRESSES.ERC8183_JOB,
     abi: ERC8183_ABI,
-    functionName: "jobs",
+    functionName: "getJob",
     args: [BigInt(args.jobId)],
   });
 
   const statusLabel = JOB_STATUS[job.status] ?? "Unknown";
-  const expiryDate = new Date(Number(job.expiry) * 1000).toISOString();
-  const isExpired = Date.now() > Number(job.expiry) * 1000;
+  const expiryDate = new Date(Number(job.expiredAt) * 1000).toISOString();
+  const isExpired = Date.now() > Number(job.expiredAt) * 1000;
 
   return {
     id: job.id.toString(),
@@ -114,15 +129,12 @@ export async function arcGetJob(args: z.infer<typeof getJobSchema>) {
     evaluator: job.evaluator,
     status: statusLabel,
     status_code: job.status,
-    amount: `${formatUsdc(job.amount, USDC_DECIMALS)} USDC`,
-    amount_raw: job.amount.toString(),
-    description_hash: job.description,
-    deliverable_hash: job.deliverable !== "0x0000000000000000000000000000000000000000000000000000000000000000"
-      ? job.deliverable
-      : null,
+    budget: `${formatUsdc(job.budget, USDC_DECIMALS)} USDC`,
+    budget_raw: job.budget.toString(),
+    description: job.description,
     expiry: expiryDate,
     expired: isExpired,
-    hook: job.hook !== "0x0000000000000000000000000000000000000000" ? job.hook : null,
+    hook: job.hook !== ZERO ? job.hook : null,
     explorer: `https://testnet.arcscan.app/address/${ADDRESSES.ERC8183_JOB}`,
   };
 }
@@ -130,68 +142,42 @@ export async function arcGetJob(args: z.infer<typeof getJobSchema>) {
 // ── arc_get_job_count ──────────────────────────────────────────────────────────
 export async function arcGetJobCount() {
   const client = getPublicClient();
-
-  // RPC limits getLogs to 10,000 blocks per call - paginate in 9,999-block chunks.
-  // Scan backwards until we find the deployment (no events for 3 consecutive chunks).
-  const CHUNK = 9_999n;
-  const MAX_EMPTY_CHUNKS = 3; // stop after 3 consecutive empty chunks
-  const jobCreatedEvent = ERC8183_ABI.find((x) => x.type === "event" && x.name === "JobCreated") as any;
-
+  const total = await client.readContract({
+    address: ADDRESSES.ERC8183_JOB,
+    abi: ERC8183_ABI,
+    functionName: "jobCounter",
+  });
   const latestBlock = await client.getBlockNumber();
-  let total = 0;
-  let emptyStreak = 0;
-  let toBlock = latestBlock;
-
-  while (toBlock > 0n) {
-    const fromBlock = toBlock > CHUNK ? toBlock - CHUNK : 0n;
-    const logs = await client.getLogs({
-      address: ADDRESSES.ERC8183_JOB,
-      event: jobCreatedEvent,
-      fromBlock,
-      toBlock,
-    });
-    total += logs.length;
-    if (logs.length === 0) {
-      emptyStreak++;
-      if (emptyStreak >= MAX_EMPTY_CHUNKS) break; // before contract deployment
-    } else {
-      emptyStreak = 0;
-    }
-    if (fromBlock === 0n) break;
-    toBlock = fromBlock - 1n;
-  }
 
   return {
-    total_jobs: total,
+    total_jobs: Number(total),
+    note: "Global counter across the shared ERC-8183 contract, not just this app's jobs.",
     latest_block: latestBlock.toString(),
     contract: ADDRESSES.ERC8183_JOB,
     explorer: `https://testnet.arcscan.app/address/${ADDRESSES.ERC8183_JOB}`,
   };
 }
 
-// ── arc_fund_job ───────────────────────────────────────────────────────────────
-export const fundJobSchema = z.object({
-  jobId: z.number().describe("ERC-8183 job ID to fund"),
-  amount: z.string().describe('USDC amount to escrow, e.g. "50" or "10.5"'),
+// ── arc_set_budget ─────────────────────────────────────────────────────────────
+export const setBudgetSchema = z.object({
+  jobId: z.number().describe("ERC-8183 job ID (must be Open)"),
+  amount: z.string().describe('USDC budget to quote, e.g. "50" or "10.5"'),
 });
 
-export async function arcFundJob(args: z.infer<typeof fundJobSchema>) {
+export async function arcSetBudget(args: z.infer<typeof setBudgetSchema>) {
   const client = getPublicClient();
   const { client: walletClient, account } = getWalletClient();
 
-  // On Arc, USDC is the native token - fundJob takes msg.value (18 decimals)
-  const amountNative = parseUsdc(args.amount, 18);
+  const amount = parseUsdc(args.amount, USDC_DECIMALS); // ERC-20 USDC = 6 dp
 
   const hash = await walletClient.writeContract({
     address: ADDRESSES.ERC8183_JOB,
     abi: ERC8183_ABI,
-    functionName: "fundJob",
-    args: [BigInt(args.jobId)],
-    value: amountNative, // native USDC (18 decimals)
+    functionName: "setBudget",
+    args: [BigInt(args.jobId), amount, NO_OPT],
     account,
     chain: walletClient.chain,
   });
-
   const receipt = await client.waitForTransactionReceipt({ hash });
 
   return {
@@ -199,9 +185,64 @@ export async function arcFundJob(args: z.infer<typeof fundJobSchema>) {
     hash,
     explorer: txLink(hash),
     jobId: args.jobId,
-    amount_escrowed: `${args.amount} USDC`,
+    budget: `${args.amount} USDC`,
+    note: "Caller must be the job's provider. The client now calls arc_fund_job.",
+  };
+}
+
+// ── arc_fund_job ───────────────────────────────────────────────────────────────
+// fund() pulls job.budget via USDC.transferFrom, so this approves first.
+// Requires the budget to already be set (arc_set_budget) and the caller to be
+// the job's client.
+export const fundJobSchema = z.object({
+  jobId: z.number().describe("ERC-8183 job ID to fund (budget must be set, status Open)"),
+});
+
+export async function arcFundJob(args: z.infer<typeof fundJobSchema>) {
+  const client = getPublicClient();
+  const { client: walletClient, account } = getWalletClient();
+
+  const job = await client.readContract({
+    address: ADDRESSES.ERC8183_JOB,
+    abi: ERC8183_ABI,
+    functionName: "getJob",
+    args: [BigInt(args.jobId)],
+  });
+  if (job.budget === 0n) {
+    throw new Error(
+      "Budget is 0. The provider must call arc_set_budget before the job can be funded."
+    );
+  }
+
+  const approveHash = await walletClient.writeContract({
+    address: ADDRESSES.USDC,
+    abi: USDC_ABI,
+    functionName: "approve",
+    args: [ADDRESSES.ERC8183_JOB, job.budget],
+    account,
+    chain: walletClient.chain,
+  });
+  await client.waitForTransactionReceipt({ hash: approveHash });
+
+  const hash = await walletClient.writeContract({
+    address: ADDRESSES.ERC8183_JOB,
+    abi: ERC8183_ABI,
+    functionName: "fund",
+    args: [BigInt(args.jobId), NO_OPT],
+    account,
+    chain: walletClient.chain,
+  });
+  const receipt = await client.waitForTransactionReceipt({ hash });
+
+  return {
+    success: receipt.status === "success",
+    hash,
+    approve_tx: approveHash,
+    explorer: txLink(hash),
+    jobId: args.jobId,
+    amount_escrowed: `${formatUsdc(job.budget, USDC_DECIMALS)} USDC`,
     status: "Funded",
-    next_step: "Provider can now call arc_submit_deliverable with the work hash.",
+    next_step: "Provider calls arc_submit_deliverable with the work hash.",
   };
 }
 
@@ -211,8 +252,8 @@ export const submitDeliverableSchema = z.object({
   deliverable: z
     .string()
     .describe(
-      "Deliverable content or IPFS/Arweave URI - will be hashed to bytes32 onchain. " +
-      "For large outputs, store on IPFS and pass the CID here."
+      "Deliverable content or IPFS/Arweave URI, hashed to bytes32 onchain. " +
+        "For large outputs store on IPFS and pass the CID."
     ),
 });
 
@@ -227,8 +268,8 @@ export async function arcSubmitDeliverable(
   const hash = await walletClient.writeContract({
     address: ADDRESSES.ERC8183_JOB,
     abi: ERC8183_ABI,
-    functionName: "submitDeliverable",
-    args: [BigInt(args.jobId), deliverableHash],
+    functionName: "submit",
+    args: [BigInt(args.jobId), deliverableHash, NO_OPT],
     account,
     chain: walletClient.chain,
   });
@@ -243,8 +284,7 @@ export async function arcSubmitDeliverable(
     deliverable_original: args.deliverable,
     deliverable_hash: deliverableHash,
     status: "Submitted",
-    next_step: "Evaluator must now call arc_complete_job or arc_reject_job.",
-    note: "The deliverable hash is stored onchain. The actual content should be available at the URI for the evaluator to review.",
+    next_step: "Evaluator calls arc_complete_job or arc_reject_job.",
   };
 }
 
@@ -254,7 +294,7 @@ export const completeJobSchema = z.object({
   reason: z
     .string()
     .default("Deliverable accepted")
-    .describe("Reason for completion - stored as bytes32 onchain"),
+    .describe("Reason for completion, stored as bytes32 onchain"),
 });
 
 export async function arcCompleteJob(args: z.infer<typeof completeJobSchema>) {
@@ -266,8 +306,8 @@ export async function arcCompleteJob(args: z.infer<typeof completeJobSchema>) {
   const hash = await walletClient.writeContract({
     address: ADDRESSES.ERC8183_JOB,
     abi: ERC8183_ABI,
-    functionName: "completeJob",
-    args: [BigInt(args.jobId), reasonHash],
+    functionName: "complete",
+    args: [BigInt(args.jobId), reasonHash, NO_OPT],
     account,
     chain: walletClient.chain,
   });
@@ -282,7 +322,7 @@ export async function arcCompleteJob(args: z.infer<typeof completeJobSchema>) {
     reason: args.reason,
     reason_hash: reasonHash,
     status: "Completed",
-    note: "USDC has been released from escrow to the provider. Job is finalized.",
+    note: "USDC released from escrow to the provider. Job finalized.",
   };
 }
 
@@ -292,7 +332,7 @@ export const rejectJobSchema = z.object({
   reason: z
     .string()
     .default("Deliverable rejected")
-    .describe("Reason for rejection - stored as bytes32 onchain"),
+    .describe("Reason for rejection, stored as bytes32 onchain"),
 });
 
 export async function arcRejectJob(args: z.infer<typeof rejectJobSchema>) {
@@ -304,8 +344,8 @@ export async function arcRejectJob(args: z.infer<typeof rejectJobSchema>) {
   const hash = await walletClient.writeContract({
     address: ADDRESSES.ERC8183_JOB,
     abi: ERC8183_ABI,
-    functionName: "rejectJob",
-    args: [BigInt(args.jobId), reasonHash],
+    functionName: "reject",
+    args: [BigInt(args.jobId), reasonHash, NO_OPT],
     account,
     chain: walletClient.chain,
   });
@@ -320,13 +360,13 @@ export async function arcRejectJob(args: z.infer<typeof rejectJobSchema>) {
     reason: args.reason,
     reason_hash: reasonHash,
     status: "Rejected",
-    note: "USDC has been refunded from escrow to the client.",
+    note: "USDC refunded from escrow to the client.",
   };
 }
 
 // ── arc_refund_job ─────────────────────────────────────────────────────────────
 export const refundJobSchema = z.object({
-  jobId: z.number().describe("ERC-8183 job ID to refund (must be Expired)"),
+  jobId: z.number().describe("ERC-8183 job ID to refund after expiry"),
 });
 
 export async function arcRefundJob(args: z.infer<typeof refundJobSchema>) {
@@ -336,7 +376,7 @@ export async function arcRefundJob(args: z.infer<typeof refundJobSchema>) {
   const hash = await walletClient.writeContract({
     address: ADDRESSES.ERC8183_JOB,
     abi: ERC8183_ABI,
-    functionName: "refundJob",
+    functionName: "claimRefund",
     args: [BigInt(args.jobId)],
     account,
     chain: walletClient.chain,
@@ -350,6 +390,6 @@ export async function arcRefundJob(args: z.infer<typeof refundJobSchema>) {
     explorer: txLink(hash),
     jobId: args.jobId,
     status: "Refunded",
-    note: "USDC has been returned to the client. Job expired without completion.",
+    note: "USDC returned to the client after expiry without completion.",
   };
 }

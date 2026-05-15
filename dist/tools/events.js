@@ -106,7 +106,7 @@ export async function arcGetJobEvents(args) {
         }).catch(() => []),
         client.getLogs({
             address: ADDRESSES.ERC8183_JOB,
-            event: ERC8183_ABI.find((x) => x.type === "event" && x.name === "DeliverableSubmitted"),
+            event: ERC8183_ABI.find((x) => x.type === "event" && x.name === "JobSubmitted"),
             args: { jobId: BigInt(args.jobId) },
             fromBlock,
             toBlock: latestBlock,
@@ -129,7 +129,7 @@ export async function arcGetJobEvents(args) {
     const timeline = [
         ...created.map((l) => ({ event: "JobCreated", block: l.blockNumber?.toString(), tx: l.transactionHash })),
         ...funded.map((l) => ({ event: "JobFunded", block: l.blockNumber?.toString(), tx: l.transactionHash })),
-        ...submitted.map((l) => ({ event: "DeliverableSubmitted", block: l.blockNumber?.toString(), tx: l.transactionHash })),
+        ...submitted.map((l) => ({ event: "JobSubmitted", block: l.blockNumber?.toString(), tx: l.transactionHash })),
         ...completed.map((l) => ({ event: "JobCompleted", block: l.blockNumber?.toString(), tx: l.transactionHash })),
         ...rejected.map((l) => ({ event: "JobRejected", block: l.blockNumber?.toString(), tx: l.transactionHash })),
     ].sort((a, b) => Number(BigInt(a.block ?? "0") - BigInt(b.block ?? "0")));
