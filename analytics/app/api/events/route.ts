@@ -43,7 +43,8 @@ export async function GET(req: NextRequest) {
     if (ev.event_name === "JobCompleted") day.jobs_completed++;
     if (ev.event_name === "JobRejected") day.jobs_rejected++;
     if (ev.event_name === "JobFunded" && ev.amount_raw) {
-      day.volume_usdc += Number(BigInt(ev.amount_raw) / BigInt(10 ** 12)) / 1_000_000;
+      // amount_raw is the ERC-20 USDC interface (6 decimals)
+      day.volume_usdc += Number(BigInt(ev.amount_raw)) / 1_000_000;
     }
     dailyMap.set(date, day);
   }
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
 
   const totalVolume = funded.reduce((s, e) => {
     if (!e.amount_raw) return s;
-    return s + Number(BigInt(e.amount_raw) / BigInt(10 ** 12)) / 1_000_000;
+    return s + Number(BigInt(e.amount_raw)) / 1_000_000;
   }, 0);
 
   // 24h events

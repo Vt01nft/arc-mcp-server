@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { publicClient, ADDRESSES, ERC8183_EVENTS_ABI } from "@/lib/viem";
 import { getServiceClient } from "@/lib/supabase";
 
-// POST /api/sync
-// Fetches the latest ~50k blocks of ERC-8183 events and upserts into event_cache.
-// Call this on a schedule (Vercel cron) or manually from the dashboard.
-export async function POST(_req: NextRequest) {
+// Fetches the latest ~50k blocks of ERC-8183 events and upserts into
+// event_cache. Exposed as POST (manual / dashboard) and GET (Vercel Cron).
+async function runSync() {
   const db = getServiceClient();
 
   const latestBlock = await publicClient.getBlockNumber();
@@ -92,4 +91,13 @@ export async function POST(_req: NextRequest) {
     synced: rows.length,
     latest_block: latestBlock.toString(),
   });
+}
+
+export async function POST() {
+  return runSync();
+}
+
+// Vercel Cron hits this endpoint with GET on the schedule in vercel.json
+export async function GET() {
+  return runSync();
 }
