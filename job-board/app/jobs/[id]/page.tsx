@@ -263,8 +263,12 @@ export default function JobDetailPage() {
               writeContract({
                 address: ADDRESSES.ERC8183_JOB,
                 abi: ERC8183_ABI,
-                functionName: "submitDeliverable",
-                args: [BigInt(chain.id), keccak256(toBytes(deliverableInput))],
+                functionName: "submit",
+                args: [
+                  BigInt(chain.id),
+                  keccak256(toBytes(deliverableInput)),
+                  "0x",
+                ],
               })
             }
             className="btn btn-primary"
@@ -432,10 +436,11 @@ export default function JobDetailPage() {
                     writeContract({
                       address: ADDRESSES.ERC8183_JOB,
                       abi: ERC8183_ABI,
-                      functionName: "completeJob",
+                      functionName: "complete",
                       args: [
                         BigInt(chain.id),
                         keccak256(toBytes(reason || "Deliverable accepted")),
+                        "0x",
                       ],
                     })
                   }
@@ -449,10 +454,11 @@ export default function JobDetailPage() {
                     writeContract({
                       address: ADDRESSES.ERC8183_JOB,
                       abi: ERC8183_ABI,
-                      functionName: "rejectJob",
+                      functionName: "reject",
                       args: [
                         BigInt(chain.id),
                         keccak256(toBytes(reason || "Deliverable rejected")),
+                        "0x",
                       ],
                     })
                   }

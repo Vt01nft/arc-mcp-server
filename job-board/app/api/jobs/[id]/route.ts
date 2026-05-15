@@ -3,7 +3,21 @@ import { publicClient, formatUsdc } from "@/lib/viem";
 import { supabase } from "@/lib/supabase";
 import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI, JOB_STATUS } from "@/contracts/abis";
-import type { ChainJob } from "@/lib/types";
+
+const ZERO_BYTES32 =
+  "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+type OnchainJob = {
+  id: bigint;
+  client: `0x${string}`;
+  provider: `0x${string}`;
+  evaluator: `0x${string}`;
+  description: string;
+  budget: bigint;
+  expiredAt: bigint;
+  status: number;
+  hook: `0x${string}`;
+};
 
 export async function GET(
   _req: NextRequest,
@@ -16,13 +30,13 @@ export async function GET(
       return NextResponse.json({ error: "Invalid job ID" }, { status: 400 });
     }
 
-    // Fetch on-chain state
+    // Fetch on-chain state (getJob returns the named Job struct)
     const chainJob = (await publicClient.readContract({
       address: ADDRESSES.ERC8183_JOB,
       abi: ERC8183_ABI,
-      functionName: "jobs",
+      functionName: "getJob",
       args: [BigInt(jobId)],
-    })) as ChainJob;
+    })) as OnchainJob;
 
     // Fetch off-chain metadata from Supabase
     const [{ data: metadata }, { data: evaluation }, { data: deliverable }] =
@@ -52,11 +66,13 @@ export async function GET(
         client: chainJob.client,
         provider: chainJob.provider,
         evaluator: chainJob.evaluator,
-        expiry: Number(chainJob.expiry),
-        amount: formatUsdc(chainJob.amount, 18), // native 18-decimal USDC
+        expiry: Number(chainJob.expiredAt),
+        amount: formatUsdc(chainJob.budget, 18), // native 18-decimal USDC
         status: chainJob.status,
         statusLabel: JOB_STATUS[chainJob.status] ?? "Unknown",
-        deliverable: chainJob.deliverable,
+        // The Job struct has no deliverable field; the hash lives in the
+        // JobSubmitted event. Submitted content is shown from Supabase.
+        deliverable: ZERO_BYTES32,
         hook: chainJob.hook,
       },
       metadata: metadata ?? null,

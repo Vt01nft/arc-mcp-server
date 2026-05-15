@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { keccak256, toBytes, zeroAddress, decodeEventLog } from "viem";
+import { zeroAddress, decodeEventLog } from "viem";
 import { publicClient, getWalletClient } from "@/lib/viem";
 import { getServiceClient } from "@/lib/supabase";
 import { ADDRESSES } from "@/contracts/addresses";
@@ -28,9 +28,6 @@ export async function POST(req: NextRequest) {
     const walletClient = getWalletClient();
     const evaluatorAddress = walletClient.account.address;
 
-    // Encode description as bytes32 (truncated keccak if too long)
-    const descHash = keccak256(toBytes(description)) as `0x${string}`;
-
     const expiryTimestamp =
       BigInt(Math.floor(Date.now() / 1000)) + BigInt(expiryHours * 3600);
 
@@ -42,8 +39,8 @@ export async function POST(req: NextRequest) {
         providerAddress as `0x${string}`,
         evaluatorAddress,
         expiryTimestamp,
-        descHash,
-        zeroAddress, // no hook for basic jobs
+        description, // on-chain description is a string, not a hash
+        zeroAddress, // no hook (address(0) is whitelisted)
       ],
       account: walletClient.account,
     });

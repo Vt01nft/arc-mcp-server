@@ -55,17 +55,15 @@ export const USDC_ABI = [
   },
 ] as const;
 
-// ─── ERC-8183: Job Escrow & Settlement ────────────────────────────────────────
-// Standard source: https://eips.ethereum.org/EIPS/eip-8183
-// Deployed on Arc Testnet: 0x0747EEf0706327138c69792bF28Cd525089e4583
+// ─── ERC-8183: Job Escrow & Settlement (AgenticCommerce) ──────────────────────
+// VERIFIED from the deployed contract on Arc Testnet.
+//   Proxy: 0x0747EEf0706327138c69792bF28Cd525089e4583 (EIP-1967)
+//   Impl:  0xa316fd02827242d537f84730f8a37d0ba5fd351a (verified on arcscan)
+// ABI matches the on-chain implementation exactly. Do NOT guess these.
 //
-// Job lifecycle states:
-//   0 = Open     → job created, awaiting funding
-//   1 = Funded   → USDC deposited into escrow
-//   2 = Submitted → provider submitted deliverable hash
-//   3 = Completed → evaluator approved, USDC released to provider
-//   4 = Rejected  → evaluator rejected, USDC refunded to client
-//   5 = Expired   → past expiry timestamp, USDC refunded to client
+// JobStatus enum (verified from source):
+//   0 = Open · 1 = Funded · 2 = Submitted · 3 = Completed
+//   4 = Rejected · 5 = Expired
 export const ERC8183_ABI = [
   // ── Write functions ──
   {
@@ -75,52 +73,68 @@ export const ERC8183_ABI = [
     inputs: [
       { name: "provider", type: "address" },
       { name: "evaluator", type: "address" },
-      { name: "expiry", type: "uint256" },
-      { name: "description", type: "bytes32" },
+      { name: "expiredAt", type: "uint256" },
+      { name: "description", type: "string" },
       { name: "hook", type: "address" },
     ],
     outputs: [{ name: "jobId", type: "uint256" }],
   },
   {
-    // Fund job: send native USDC as msg.value (18-decimal precision)
-    name: "fundJob",
+    name: "setBudget",
     type: "function",
-    stateMutability: "payable",
-    inputs: [{ name: "jobId", type: "uint256" }],
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "jobId", type: "uint256" },
+      { name: "amount", type: "uint256" },
+      { name: "optParams", type: "bytes" },
+    ],
     outputs: [],
   },
   {
-    name: "submitDeliverable",
+    name: "fund",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "jobId", type: "uint256" },
+      { name: "optParams", type: "bytes" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "submit",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [
       { name: "jobId", type: "uint256" },
       { name: "deliverable", type: "bytes32" },
+      { name: "optParams", type: "bytes" },
     ],
     outputs: [],
   },
   {
-    name: "completeJob",
+    name: "complete",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [
       { name: "jobId", type: "uint256" },
       { name: "reason", type: "bytes32" },
+      { name: "optParams", type: "bytes" },
     ],
     outputs: [],
   },
   {
-    name: "rejectJob",
+    name: "reject",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [
       { name: "jobId", type: "uint256" },
       { name: "reason", type: "bytes32" },
+      { name: "optParams", type: "bytes" },
     ],
     outputs: [],
   },
   {
-    name: "refundJob",
+    name: "claimRefund",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [{ name: "jobId", type: "uint256" }],
@@ -128,7 +142,7 @@ export const ERC8183_ABI = [
   },
   // ── Read functions ──
   {
-    name: "jobs",
+    name: "getJob",
     type: "function",
     stateMutability: "view",
     inputs: [{ name: "jobId", type: "uint256" }],
@@ -141,18 +155,17 @@ export const ERC8183_ABI = [
           { name: "client", type: "address" },
           { name: "provider", type: "address" },
           { name: "evaluator", type: "address" },
-          { name: "expiry", type: "uint256" },
-          { name: "description", type: "bytes32" },
-          { name: "amount", type: "uint256" },
+          { name: "description", type: "string" },
+          { name: "budget", type: "uint256" },
+          { name: "expiredAt", type: "uint256" },
           { name: "status", type: "uint8" },
-          { name: "deliverable", type: "bytes32" },
           { name: "hook", type: "address" },
         ],
       },
     ],
   },
   {
-    name: "jobCount",
+    name: "jobCounter",
     type: "function",
     stateMutability: "view",
     inputs: [],
@@ -166,6 +179,9 @@ export const ERC8183_ABI = [
       { name: "jobId", type: "uint256", indexed: true },
       { name: "client", type: "address", indexed: true },
       { name: "provider", type: "address", indexed: true },
+      { name: "evaluator", type: "address", indexed: false },
+      { name: "expiredAt", type: "uint256", indexed: false },
+      { name: "hook", type: "address", indexed: false },
     ],
   },
   {
@@ -173,14 +189,16 @@ export const ERC8183_ABI = [
     type: "event",
     inputs: [
       { name: "jobId", type: "uint256", indexed: true },
+      { name: "client", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
     ],
   },
   {
-    name: "DeliverableSubmitted",
+    name: "JobSubmitted",
     type: "event",
     inputs: [
       { name: "jobId", type: "uint256", indexed: true },
+      { name: "provider", type: "address", indexed: true },
       { name: "deliverable", type: "bytes32", indexed: false },
     ],
   },
@@ -189,6 +207,7 @@ export const ERC8183_ABI = [
     type: "event",
     inputs: [
       { name: "jobId", type: "uint256", indexed: true },
+      { name: "evaluator", type: "address", indexed: true },
       { name: "reason", type: "bytes32", indexed: false },
     ],
   },
@@ -197,7 +216,17 @@ export const ERC8183_ABI = [
     type: "event",
     inputs: [
       { name: "jobId", type: "uint256", indexed: true },
+      { name: "rejector", type: "address", indexed: true },
       { name: "reason", type: "bytes32", indexed: false },
+    ],
+  },
+  {
+    name: "Refunded",
+    type: "event",
+    inputs: [
+      { name: "jobId", type: "uint256", indexed: true },
+      { name: "client", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
     ],
   },
 ] as const;

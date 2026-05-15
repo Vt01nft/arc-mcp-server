@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { keccak256, toBytes, zeroAddress, decodeEventLog } from "viem";
+import { zeroAddress, decodeEventLog } from "viem";
 import { ERC8183_ABI } from "@/contracts/abis";
 import { ADDRESSES } from "@/contracts/addresses";
 import { JOB_CATEGORIES, type JobCategory } from "@/lib/types";
@@ -84,8 +84,8 @@ export default function PostJobPage() {
     if (msg.includes("User rejected") || msg.includes("user rejected")) {
       return "Transaction rejected in wallet.";
     }
-    if (msg.includes("client cannot be evaluator") || msg.includes("reverted")) {
-      return "Transaction reverted. If your wallet is the evaluator address, use a different wallet to post jobs.";
+    if (msg.includes("insufficient funds")) {
+      return "Insufficient USDC for gas. Top up this wallet from faucet.circle.com.";
     }
     return msg || "Transaction failed.";
   }, [writeError]);
@@ -103,16 +103,9 @@ export default function PostJobPage() {
       setError("Description and provider address are required.");
       return;
     }
-    if (address?.toLowerCase() === EVALUATOR_ADDRESS.toLowerCase()) {
-      setError(
-        "Your connected wallet is the evaluator address. Use a different wallet to post jobs. The evaluator cannot also be the job client."
-      );
-      return;
-    }
     setError(null);
     savedRef.current = false;
 
-    const descHash = keccak256(toBytes(form.description)) as `0x${string}`;
     const expiryTimestamp =
       BigInt(Math.floor(Date.now() / 1000)) + BigInt(form.expiryHours * 3600);
 
@@ -124,8 +117,8 @@ export default function PostJobPage() {
         form.providerAddress as `0x${string}`,
         EVALUATOR_ADDRESS,
         expiryTimestamp,
-        descHash,
-        zeroAddress,
+        form.description, // on-chain description is a string, not a hash
+        zeroAddress, // no hook (address(0) is whitelisted)
       ],
     });
   }

@@ -19,16 +19,16 @@ export const JOB_STATUS_COLOR: Record<JobStatus, string> = {
   5: "status-expired",
 };
 
+// Mirrors the deployed AgenticCommerce.Job struct (getJob).
 export type ChainJob = {
   id: bigint;
   client: `0x${string}`;
   provider: `0x${string}`;
   evaluator: `0x${string}`;
-  expiry: bigint;
-  description: `0x${string}`;
-  amount: bigint;
+  description: string;
+  budget: bigint;
+  expiredAt: bigint;
   status: number;
-  deliverable: `0x${string}`;
   hook: `0x${string}`;
 };
 
