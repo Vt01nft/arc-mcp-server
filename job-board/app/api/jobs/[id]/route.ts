@@ -67,7 +67,9 @@ export async function GET(
         provider: chainJob.provider,
         evaluator: chainJob.evaluator,
         expiry: Number(chainJob.expiredAt),
-        amount: formatUsdc(chainJob.budget, 18), // native 18-decimal USDC
+        // budget is the ERC-20 USDC interface (6 decimals), not native 18
+        amount: formatUsdc(chainJob.budget, 6),
+        budgetRaw: chainJob.budget.toString(),
         status: chainJob.status,
         statusLabel: JOB_STATUS[chainJob.status] ?? "Unknown",
         // The Job struct has no deliverable field; the hash lives in the

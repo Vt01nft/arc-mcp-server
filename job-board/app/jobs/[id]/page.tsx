@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAccount, useWriteContract } from "wagmi";
-import { keccak256, toBytes } from "viem";
+import { keccak256, toBytes, parseUnits } from "viem";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ADDRESSES } from "@/contracts/addresses";
-import { ERC8183_ABI } from "@/contracts/abis";
+import { ERC8183_ABI, USDC_ABI } from "@/contracts/abis";
+import { publicClient } from "@/lib/viem";
 import type { EvaluateResponse } from "@/lib/types";
 
 type JobData = {
@@ -18,6 +19,7 @@ type JobData = {
     evaluator: string;
     expiry: number;
     amount: string;
+    budgetRaw: string;
     status: number;
     statusLabel: string;
     deliverable: string;
@@ -47,7 +49,8 @@ const ZERO_BYTES32 =
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { address } = useAccount();
-  const { writeContract, isPending: isTxPending } = useWriteContract();
+  const { writeContract, writeContractAsync, isPending: isTxPending } =
+    useWriteContract();
 
   const [job, setJob] = useState<JobData | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -55,6 +58,9 @@ export default function JobDetailPage() {
   const [evalResult, setEvalResult] = useState<EvaluateResponse | null>(null);
   const [deliverableInput, setDeliverableInput] = useState("");
   const [reason, setReason] = useState("");
+  const [budgetInput, setBudgetInput] = useState("");
+  const [funding, setFunding] = useState(false);
+  const [escrowErr, setEscrowErr] = useState<string | null>(null);
 
   // `loading` is derived: true until the fetch for the current `id` resolves.
   // When `id` changes, loadedId is stale so this flips back to true on render,
@@ -152,6 +158,43 @@ export default function JobDetailPage() {
     address && chain.evaluator !== ZERO_BYTES32
       ? address.toLowerCase() === chain.evaluator.toLowerCase()
       : false;
+  const isClient =
+    address && chain.client !== ZERO_BYTES32
+      ? address.toLowerCase() === chain.client.toLowerCase()
+      : false;
+  const budgetRaw = BigInt(chain.budgetRaw || "0");
+  const isOpen = chain.status === 0;
+
+  // Client funds escrow: approve USDC for the job contract, then fund().
+  // fund() pulls job.budget via USDC.transferFrom, so an allowance is required.
+  async function handleFund() {
+    if (!isClient || budgetRaw <= 0n) return;
+    setEscrowErr(null);
+    setFunding(true);
+    try {
+      const approveHash = await writeContractAsync({
+        address: ADDRESSES.USDC,
+        abi: USDC_ABI,
+        functionName: "approve",
+        args: [ADDRESSES.ERC8183_JOB, budgetRaw],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      const fundHash = await writeContractAsync({
+        address: ADDRESSES.ERC8183_JOB,
+        abi: ERC8183_ABI,
+        functionName: "fund",
+        args: [BigInt(chain.id), "0x"],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: fundHash });
+      window.location.reload();
+    } catch (e) {
+      const m = e as Error & { shortMessage?: string };
+      setEscrowErr(m.shortMessage || m.message || "Funding failed.");
+    } finally {
+      setFunding(false);
+    }
+  }
+
   const hasDeliverable =
     chain.deliverable && chain.deliverable !== ZERO_BYTES32;
   const activeEvaluation = evalResult ?? job.evaluation;
@@ -240,6 +283,96 @@ export default function JobDetailPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Provider sets the budget (price) while the job is Open */}
+      {isOpen && isProvider && budgetRaw === 0n && (
+        <div
+          className="paper-card"
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
+        >
+          <h2 className="serif-h" style={{ fontSize: 22, margin: 0 }}>
+            Set Your Budget
+          </h2>
+          <p
+            className="eyebrow"
+            style={{ textTransform: "none", letterSpacing: 0 }}
+          >
+            You are the assigned provider. Quote the USDC bounty for this job;
+            the client funds it into escrow next.
+          </p>
+          <input
+            className="field"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="Amount in USDC"
+            value={budgetInput}
+            onChange={(e) => setBudgetInput(e.target.value)}
+          />
+          <button
+            className="btn btn-primary"
+            style={{ alignSelf: "flex-start" }}
+            disabled={!budgetInput || Number(budgetInput) <= 0 || isTxPending}
+            onClick={() =>
+              writeContract({
+                address: ADDRESSES.ERC8183_JOB,
+                abi: ERC8183_ABI,
+                functionName: "setBudget",
+                args: [
+                  BigInt(chain.id),
+                  parseUnits(budgetInput || "0", 6),
+                  "0x",
+                ],
+              })
+            }
+          >
+            {isTxPending ? "Setting…" : "Set Budget"}
+          </button>
+        </div>
+      )}
+
+      {/* Client funds the escrow while the job is Open */}
+      {isOpen && isClient && (
+        <div
+          className="paper-card"
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
+        >
+          <h2 className="serif-h" style={{ fontSize: 22, margin: 0 }}>
+            Fund Escrow
+          </h2>
+          {budgetRaw > 0n ? (
+            <>
+              <p
+                className="eyebrow"
+                style={{ textTransform: "none", letterSpacing: 0 }}
+              >
+                Lock <b>{chain.amount} USDC</b> into ERC-8183 escrow. This
+                approves USDC, then funds the job (two wallet transactions).
+              </p>
+              {escrowErr && (
+                <div className="notice notice-bad">{escrowErr}</div>
+              )}
+              <button
+                className="btn btn-primary"
+                style={{ alignSelf: "flex-start" }}
+                disabled={funding}
+                onClick={handleFund}
+              >
+                {funding
+                  ? "Funding…"
+                  : `Approve & Fund ${chain.amount} USDC`}
+              </button>
+            </>
+          ) : (
+            <p
+              className="eyebrow"
+              style={{ textTransform: "none", letterSpacing: 0 }}
+            >
+              Waiting for the provider to set a budget before you can fund.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Provider: submit deliverable - visible when Funded (status 1) and connected as provider */}
       {chain.status === 1 && isProvider && (
