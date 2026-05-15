@@ -4,6 +4,7 @@ import { ArcLogo } from "./ArcLogo";
 const FAUCET_URL = "https://faucet.circle.com";
 const DOCS_URL = "https://arc.network";
 const EXPLORER_URL = "https://testnet.arcscan.app";
+const ANALYTICS_URL = "https://arc-analytics-eight.vercel.app";
 
 export function Footer() {
   return (
@@ -38,6 +39,9 @@ export function Footer() {
           </a>
           <a href={EXPLORER_URL} target="_blank" rel="noopener noreferrer">
             Block Explorer
+          </a>
+          <a href={ANALYTICS_URL} target="_blank" rel="noopener noreferrer">
+            Analytics Dashboard
           </a>
         </div>
       </div>

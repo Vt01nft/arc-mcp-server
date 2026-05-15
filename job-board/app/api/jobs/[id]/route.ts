@@ -66,6 +66,7 @@ export async function GET(
         client: chainJob.client,
         provider: chainJob.provider,
         evaluator: chainJob.evaluator,
+        description: chainJob.description, // on-chain string description
         expiry: Number(chainJob.expiredAt),
         // budget is the ERC-20 USDC interface (6 decimals), not native 18
         amount: formatUsdc(chainJob.budget, 6),

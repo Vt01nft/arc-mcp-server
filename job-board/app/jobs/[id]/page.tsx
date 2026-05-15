@@ -17,6 +17,7 @@ type JobData = {
     client: string;
     provider: string;
     evaluator: string;
+    description: string;
     expiry: number;
     amount: string;
     budgetRaw: string;
@@ -249,7 +250,7 @@ export default function JobDetailPage() {
             {metadata?.category && <span className="tag">{metadata.category}</span>}
           </div>
           <h1 className="serif-h" style={{ fontSize: 34, margin: 0 }}>
-            {metadata?.description ?? `Job #${chain.id}`}
+            {metadata?.description ?? chain.description ?? `Job #${chain.id}`}
           </h1>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -282,6 +283,39 @@ export default function JobDetailPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* How this works — status + role aware */}
+      <div className="paper-card-soft" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="eyebrow accent">How this job works</div>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+          Lifecycle: <b>Open</b> &rarr; provider sets budget &rarr; client funds
+          escrow (<b>Funded</b>) &rarr; provider submits work (<b>Submitted</b>)
+          &rarr; evaluator approves (<b>Completed</b>, USDC released to provider)
+          or rejects (<b>Rejected</b>, USDC refunded). The provider is the wallet
+          assigned when the job was created.
+        </p>
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+          {chain.status === 0 && budgetRaw === 0n &&
+            (isProvider
+              ? "Your move: you are the provider. Set your USDC budget below."
+              : "Next: the assigned provider sets a budget (price).")}
+          {chain.status === 0 && budgetRaw > 0n &&
+            (isClient
+              ? "Your move: you are the client. Approve & fund the escrow below."
+              : "Next: the client funds the escrow.")}
+          {chain.status === 1 &&
+            (isProvider
+              ? "Your move: you are the provider. Do the work and submit the deliverable below."
+              : "Next: the provider submits the deliverable.")}
+          {chain.status === 2 &&
+            (isEvaluator
+              ? "Your move: you are the evaluator. Review and approve or reject below."
+              : "Next: Claude evaluates and the evaluator approves or rejects.")}
+          {chain.status === 3 && "Done. USDC was released to the provider."}
+          {chain.status === 4 && "Closed. USDC was refunded to the client."}
+          {chain.status === 5 && "Expired. The client can claim a refund."}
+        </p>
       </div>
 
       {/* Provider sets the budget (price) while the job is Open */}

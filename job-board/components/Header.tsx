@@ -7,6 +7,7 @@ import { ArcLogo } from "./ArcLogo";
 const FAUCET_URL = "https://faucet.circle.com";
 const DOCS_URL = "https://arc.network";
 const EXPLORER_URL = "https://testnet.arcscan.app";
+const ANALYTICS_URL = "https://arc-analytics-eight.vercel.app";
 
 export function Header() {
   return (
@@ -47,6 +48,14 @@ export function Header() {
             rel="noopener noreferrer"
           >
             Explorer
+          </a>
+          <a
+            className="mast-link"
+            href={ANALYTICS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Analytics
           </a>
           <ConnectButton
             accountStatus="address"
