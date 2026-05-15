@@ -27,7 +27,8 @@ export async function POST(_req: NextRequest) {
 
   for (let i = 0; i < CHUNKS_TO_SYNC; i++) {
     const toBlock = latestBlock - BigInt(i) * CHUNK;
-    const fromBlock = toBlock > CHUNK ? toBlock - CHUNK : 0n;
+    // +1 so adjacent chunks don't both include the boundary block
+    const fromBlock = toBlock > CHUNK ? toBlock - CHUNK + 1n : 0n;
     if (fromBlock >= toBlock) break;
 
     // Fetch each event type individually (viem filters by topic[0])
@@ -74,14 +75,21 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ synced: 0, latest_block: latestBlock.toString() });
   }
 
+  // Dedupe by the unique key (tx_hash, event_name): a single Postgres
+  // ON CONFLICT upsert cannot touch the same conflict target twice, and
+  // chunk boundaries / multi-log txs can otherwise repeat a key.
+  const uniq = new Map<string, (typeof allRows)[number]>();
+  for (const r of allRows) uniq.set(`${r.tx_hash}|${r.event_name}`, r);
+  const rows = Array.from(uniq.values());
+
   const { error } = await db
     .from("event_cache")
-    .upsert(allRows, { onConflict: "tx_hash,event_name" });
+    .upsert(rows, { onConflict: "tx_hash,event_name" });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({
-    synced: allRows.length,
+    synced: rows.length,
     latest_block: latestBlock.toString(),
   });
 }
