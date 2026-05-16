@@ -8,6 +8,7 @@ import { zeroAddress, decodeEventLog } from "viem";
 import { ERC8183_ABI } from "@/contracts/abis";
 import { ADDRESSES } from "@/contracts/addresses";
 import { JOB_CATEGORIES, type JobCategory } from "@/lib/types";
+import { useCircle } from "@/components/CircleProvider";
 
 const EVALUATOR_ADDRESS = (
   process.env.NEXT_PUBLIC_EVALUATOR_ADDRESS ?? "0x3d1e88e762d8872365c050cde888729aec773eab"
@@ -16,6 +17,7 @@ const EVALUATOR_ADDRESS = (
 export default function PostJobPage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
+  const circle = useCircle();
   const [form, setForm] = useState({
     description: "",
     category: "General" as JobCategory,
@@ -97,7 +99,7 @@ export default function PostJobPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.description || !form.providerAddress) {
       setError("Description and provider address are required.");
@@ -108,6 +110,44 @@ export default function PostJobPage() {
 
     const expiryTimestamp =
       BigInt(Math.floor(Date.now() / 1000)) + BigInt(form.expiryHours * 3600);
+
+    // Circle wallet path: PIN-sign createJob via Circle, then save metadata.
+    // (Circle broadcasts async, so the chain jobId is resolved by the
+    // on-chain Browse fallback rather than from a receipt here.)
+    if (circle.status === "ready") {
+      setSaving(true);
+      try {
+        await circle.execute({
+          address: ADDRESSES.ERC8183_JOB,
+          abi: ERC8183_ABI,
+          functionName: "createJob",
+          args: [
+            form.providerAddress as `0x${string}`,
+            EVALUATOR_ADDRESS,
+            expiryTimestamp,
+            form.description,
+            zeroAddress,
+          ],
+        });
+        await fetch("/api/jobs/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chainJobId: null,
+            description: form.description,
+            category: form.category,
+            clientAddress: circle.address,
+            providerAddress: form.providerAddress,
+          }),
+        }).catch(() => {});
+        router.push("/jobs");
+      } catch (err) {
+        setError((err as Error).message || "Circle transaction failed.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
 
     writeContract({
       address: ADDRESSES.ERC8183_JOB,
@@ -147,7 +187,7 @@ export default function PostJobPage() {
         only released when Claude approves the deliverable.
       </p>
 
-      {!isConnected ? (
+      {!isConnected && circle.status !== "ready" ? (
         <div
           className="paper-card"
           style={{
@@ -158,7 +198,10 @@ export default function PostJobPage() {
             padding: "48px 24px",
           }}
         >
-          <p className="eyebrow">Connect a wallet to post a job on Arc</p>
+          <p className="eyebrow">
+            Connect a wallet, or use “Sign in with Circle” in the header, to
+            post a job on Arc
+          </p>
           <ConnectButton />
         </div>
       ) : (
@@ -241,7 +284,7 @@ export default function PostJobPage() {
           >
             <div>
               <span style={{ color: "var(--ink)" }}>Your address:</span>{" "}
-              {address}
+              {address ?? circle.address ?? "—"}
             </div>
             <div>
               <span style={{ color: "var(--ink)" }}>Evaluator:</span> Claude

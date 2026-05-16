@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ArcLogo } from "./ArcLogo";
+import { CircleButton } from "./CircleButton";
 
 const FAUCET_URL = "https://faucet.circle.com";
 const DOCS_URL = "https://arc.network";
@@ -57,6 +58,7 @@ export function Header() {
           >
             Analytics
           </a>
+          <CircleButton />
           <ConnectButton
             accountStatus="address"
             chainStatus="none"
