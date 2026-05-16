@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ArcLogo } from "./ArcLogo";
 import { CircleButton } from "./CircleButton";
 
@@ -59,11 +58,6 @@ export function Header() {
             Analytics
           </a>
           <CircleButton />
-          <ConnectButton
-            accountStatus="address"
-            chainStatus="none"
-            showBalance={false}
-          />
         </span>
       </div>
 

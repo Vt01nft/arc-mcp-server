@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAccount, useWriteContract } from "wagmi";
+import { useCircle } from "@/components/CircleProvider";
 import { keccak256, toBytes, parseUnits } from "viem";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -52,6 +53,24 @@ export default function JobDetailPage() {
   const { address } = useAccount();
   const { writeContract, writeContractAsync, isPending: isTxPending } =
     useWriteContract();
+  const circle = useCircle();
+  const circleReady = circle.status === "ready";
+
+  // One write path for both wallets. Circle is primary (only login now);
+  // wagmi remains a fallback if a wallet is ever connected.
+  async function act(p: {
+    address: `0x${string}`;
+    abi: readonly unknown[];
+    functionName: string;
+    args: readonly unknown[];
+  }) {
+    if (circleReady) {
+      await circle.execute(p);
+      window.location.reload();
+    } else {
+      writeContract(p as Parameters<typeof writeContract>[0]);
+    }
+  }
 
   const [job, setJob] = useState<JobData | null>(null);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -151,17 +170,19 @@ export default function JobDetailPage() {
   }
 
   const { chain, metadata, deliverable } = job;
+  // Effective account: Circle wallet (primary login) or a connected wallet.
+  const acct = (circle.address ?? address ?? null) as string | null;
   const isProvider =
-    address && chain.provider !== ZERO_BYTES32
-      ? address.toLowerCase() === chain.provider.toLowerCase()
+    acct && chain.provider !== ZERO_BYTES32
+      ? acct.toLowerCase() === chain.provider.toLowerCase()
       : false;
   const isEvaluator =
-    address && chain.evaluator !== ZERO_BYTES32
-      ? address.toLowerCase() === chain.evaluator.toLowerCase()
+    acct && chain.evaluator !== ZERO_BYTES32
+      ? acct.toLowerCase() === chain.evaluator.toLowerCase()
       : false;
   const isClient =
-    address && chain.client !== ZERO_BYTES32
-      ? address.toLowerCase() === chain.client.toLowerCase()
+    acct && chain.client !== ZERO_BYTES32
+      ? acct.toLowerCase() === chain.client.toLowerCase()
       : false;
   const budgetRaw = BigInt(chain.budgetRaw || "0");
   const isOpen = chain.status === 0;
@@ -173,21 +194,37 @@ export default function JobDetailPage() {
     setEscrowErr(null);
     setFunding(true);
     try {
-      const approveHash = await writeContractAsync({
-        address: ADDRESSES.USDC,
-        abi: USDC_ABI,
-        functionName: "approve",
-        args: [ADDRESSES.ERC8183_JOB, budgetRaw],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: approveHash });
-      const fundHash = await writeContractAsync({
-        address: ADDRESSES.ERC8183_JOB,
-        abi: ERC8183_ABI,
-        functionName: "fund",
-        args: [BigInt(chain.id), "0x"],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: fundHash });
-      window.location.reload();
+      if (circleReady) {
+        await circle.execute({
+          address: ADDRESSES.USDC,
+          abi: USDC_ABI,
+          functionName: "approve",
+          args: [ADDRESSES.ERC8183_JOB, budgetRaw],
+        });
+        await circle.execute({
+          address: ADDRESSES.ERC8183_JOB,
+          abi: ERC8183_ABI,
+          functionName: "fund",
+          args: [BigInt(chain.id), "0x"],
+        });
+        window.location.reload();
+      } else {
+        const approveHash = await writeContractAsync({
+          address: ADDRESSES.USDC,
+          abi: USDC_ABI,
+          functionName: "approve",
+          args: [ADDRESSES.ERC8183_JOB, budgetRaw],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        const fundHash = await writeContractAsync({
+          address: ADDRESSES.ERC8183_JOB,
+          abi: ERC8183_ABI,
+          functionName: "fund",
+          args: [BigInt(chain.id), "0x"],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: fundHash });
+        window.location.reload();
+      }
     } catch (e) {
       const m = e as Error & { shortMessage?: string };
       setEscrowErr(m.shortMessage || m.message || "Funding failed.");
@@ -348,7 +385,7 @@ export default function JobDetailPage() {
             style={{ alignSelf: "flex-start" }}
             disabled={!budgetInput || Number(budgetInput) <= 0 || isTxPending}
             onClick={() =>
-              writeContract({
+              act({
                 address: ADDRESSES.ERC8183_JOB,
                 abi: ERC8183_ABI,
                 functionName: "setBudget",
@@ -427,7 +464,7 @@ export default function JobDetailPage() {
           <button
             disabled={!deliverableInput || isTxPending}
             onClick={() =>
-              writeContract({
+              act({
                 address: ADDRESSES.ERC8183_JOB,
                 abi: ERC8183_ABI,
                 functionName: "submit",
@@ -600,7 +637,7 @@ export default function JobDetailPage() {
                 <button
                   disabled={isTxPending}
                   onClick={() =>
-                    writeContract({
+                    act({
                       address: ADDRESSES.ERC8183_JOB,
                       abi: ERC8183_ABI,
                       functionName: "complete",
@@ -618,7 +655,7 @@ export default function JobDetailPage() {
                 <button
                   disabled={isTxPending}
                   onClick={() =>
-                    writeContract({
+                    act({
                       address: ADDRESSES.ERC8183_JOB,
                       abi: ERC8183_ABI,
                       functionName: "reject",

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { zeroAddress, decodeEventLog } from "viem";
 import { ERC8183_ABI } from "@/contracts/abis";
 import { ADDRESSES } from "@/contracts/addresses";
@@ -16,7 +15,7 @@ const EVALUATOR_ADDRESS = (
 
 export default function PostJobPage() {
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
   const circle = useCircle();
   const [form, setForm] = useState({
     description: "",
@@ -187,7 +186,7 @@ export default function PostJobPage() {
         only released when Claude approves the deliverable.
       </p>
 
-      {!isConnected && circle.status !== "ready" ? (
+      {circle.status !== "ready" ? (
         <div
           className="paper-card"
           style={{
@@ -199,10 +198,9 @@ export default function PostJobPage() {
           }}
         >
           <p className="eyebrow">
-            Connect a wallet, or use “Sign in with Circle” in the header, to
-            post a job on Arc
+            Use “Sign in with Circle” in the header (email + PIN) to post a job
+            on Arc. No wallet extension needed.
           </p>
-          <ConnectButton />
         </div>
       ) : (
         <form
