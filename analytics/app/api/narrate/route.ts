@@ -75,9 +75,17 @@ Reply in this exact JSON format (no markdown, no explanation):
     return NextResponse.json(response);
   } catch (err) {
     console.error("Narration error:", err);
+    const e = err as { status?: number; message?: string };
+    const providerIssue =
+      typeof e?.status === "number" ||
+      /anthropic|credit balance|rate limit|overloaded/i.test(e?.message ?? "");
     return NextResponse.json(
-      { error: "Narration failed. Please try again." },
-      { status: 500 }
+      {
+        error: providerIssue
+          ? "Narration temporarily unavailable (model provider error)."
+          : "Narration failed. Please try again.",
+      },
+      { status: providerIssue ? 503 : 500 }
     );
   }
 }

@@ -127,6 +127,23 @@ Respond with ONLY a JSON object in exactly this format:
     return NextResponse.json(result);
   } catch (err) {
     console.error("Evaluation error:", err);
+    // Distinguish a model-provider outage (e.g. Anthropic credit/rate limit)
+    // from a real server fault so the UI can explain it. The on-chain job is
+    // unaffected: the evaluator wallet can still complete/reject manually.
+    const e = err as { status?: number; message?: string };
+    const msg = e?.message ?? "";
+    const providerIssue =
+      typeof e?.status === "number" ||
+      /anthropic|credit balance|rate limit|overloaded/i.test(msg);
+    if (providerIssue) {
+      return NextResponse.json(
+        {
+          error:
+            "AI evaluator temporarily unavailable (model provider error). The on-chain job is unaffected; the evaluator can still decide manually.",
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: "Evaluation failed. Please try again." },
       { status: 500 }
