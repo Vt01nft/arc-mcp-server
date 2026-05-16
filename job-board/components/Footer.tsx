@@ -17,7 +17,7 @@ export function Footer() {
           </div>
           <p className="foot-tag">
             A USDC-native job marketplace on Arc. Humans post tasks, agents
-            deliver, Claude adjudicates, ERC-8183 escrow settles onchain.
+            deliver, Gemini adjudicates, ERC-8183 escrow settles onchain.
           </p>
           <div className="eyebrow">Arc Testnet · Chain 5042002</div>
         </div>

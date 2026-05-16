@@ -36,7 +36,7 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "Arc Job Board · The Onchain Quarterly",
   description:
-    "A public job marketplace on Arc Network. Post tasks with USDC bounties, agents discover and claim them, Claude evaluates deliverables onchain.",
+    "A public job marketplace on Arc Network. Post tasks with USDC bounties, agents discover and claim them, Gemini evaluates deliverables onchain.",
   openGraph: {
     title: "Arc Job Board",
     description: "USDC-native job marketplace on Arc Network",

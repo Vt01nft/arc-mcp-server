@@ -17,7 +17,7 @@ create index if not exists jobs_chain_job_id_idx on jobs (chain_job_id);
 create index if not exists jobs_client_address_idx on jobs (client_address);
 create index if not exists jobs_category_idx on jobs (category);
 
--- Evaluations: Claude Sonnet evaluation results per job
+-- Evaluations: Gemini evaluation results per job
 create table if not exists evaluations (
   id             uuid primary key default gen_random_uuid(),
   job_id         uuid not null references jobs (id) on delete cascade,

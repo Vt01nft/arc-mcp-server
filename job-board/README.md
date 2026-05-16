@@ -1,8 +1,8 @@
 # Arc Job Board
 
-A public job marketplace on Arc Network where humans post tasks with USDC bounties, ERC-8004 registered agents discover and claim them, ERC-8183 handles escrow, and Claude Sonnet acts as the onchain evaluator.
+A public job marketplace on Arc Network where humans post tasks with USDC bounties, an assigned agent delivers the work, ERC-8183 handles escrow, and Google Gemini acts as the AI evaluator. Login is a Circle Programmable Wallet (email + PIN), no extension needed.
 
-**Live demo:** [PLACEHOLDER - add Vercel URL after deploy]
+**Live:** https://arc-job-board.vercel.app
 
 ---
 
@@ -11,7 +11,7 @@ A public job marketplace on Arc Network where humans post tasks with USDC bounti
 - **Browse jobs** - filter by status, category, and search
 - **Post jobs** - describe a task, set a USDC bounty, assign a provider address
 - **Job lifecycle** - ERC-8183 escrow: Open → Funded → Submitted → Completed/Rejected
-- **Claude evaluator** - Claude Sonnet reviews every deliverable and approves/rejects via `POST /api/evaluate`
+- **Gemini evaluator** - Google Gemini reviews every deliverable and recommends approve/reject via `POST /api/evaluate` (advisory; a human evaluator wallet signs the final on-chain settlement)
 - **Agent profiles** - ERC-8004 reputation scores, feedback history
 - **Supabase** - persists job metadata, evaluation reasoning, and deliverable previews
 
@@ -21,10 +21,10 @@ A public job marketplace on Arc Network where humans post tasks with USDC bounti
 
 | Layer | Tech |
 |---|---|
-| Framework | Next.js 14 (App Router) |
-| Wallet | wagmi + RainbowKit |
+| Framework | Next.js 16 (App Router) |
+| Wallet | Circle Programmable Wallet, W3S user-controlled (email + PIN) |
 | Chain client | viem |
-| Evaluator | Claude Sonnet (`@anthropic-ai/sdk`) |
+| Evaluator | Google Gemini (`generativelanguage` REST API) |
 | Database | Supabase (supabase-js) |
 | Styling | Tailwind CSS |
 | Deployment | Vercel |
@@ -53,7 +53,9 @@ Fill in `.env.local`:
 |---|---|
 | `PRIVATE_KEY` | Arc testnet wallet - get test USDC from [faucet.circle.com](https://faucet.circle.com) |
 | `NEXT_PUBLIC_ARC_RPC` | `https://rpc.testnet.arc.network` (already set) |
-| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
+| `GEMINI_API_KEY` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free tier) |
+| `CIRCLE_API_KEY` | Circle console (server-only secret) |
+| `NEXT_PUBLIC_CIRCLE_APP_ID` | Circle console (public app id) |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project → Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project → Settings → API |
@@ -63,7 +65,7 @@ Fill in `.env.local`:
 
 Run `supabase/schema.sql` in your Supabase project's SQL editor. This creates:
 - `jobs` - off-chain metadata for on-chain ERC-8183 jobs
-- `evaluations` - Claude evaluation results per job
+- `evaluations` - Gemini evaluation results per job
 - `deliverables` - IPFS CIDs and content previews
 
 ### 4. Run dev server
@@ -102,9 +104,11 @@ Explorer: [testnet.arcscan.app](https://testnet.arcscan.app)
 
 | Route | Method | Purpose |
 |---|---|---|
-| `/api/evaluate` | POST | Claude Sonnet evaluates a deliverable |
-| `/api/jobs/create` | POST | Create an ERC-8183 job onchain + save metadata |
+| `/api/evaluate` | POST | Gemini evaluates a deliverable (gated to real Submitted jobs) |
+| `/api/jobs/save` | POST | Persist job metadata to Supabase after on-chain create |
 | `/api/jobs/[id]` | GET | Fetch job state from chain + metadata from Supabase |
+| `/api/jobs/onchain` | GET | On-chain fallback list of this app's jobs |
+| `/api/circle/{session,initialize,contract}` | POST | Circle wallet session, PIN init, tx challenge |
 
 ---
 
@@ -114,9 +118,9 @@ This is Phase 2 of a 4-phase open source contribution to Arc Network:
 
 | Phase | Repo | Status |
 |---|---|---|
-| 1 | [arc-mcp-server](https://github.com/Vt01nft/arc-mcp-server) | Shipped - 22 tools for live Arc testnet access |
-| 2 | [arc-job-board](https://github.com/Vt01nft/arc-job-board) | This repo |
-| 3 | [arc-multi-evaluator](https://github.com/Vt01nft/arc-multi-evaluator) | Coming - ERC-8183 hook, 3-agent jury system |
-| 4 | [arc-analytics](https://github.com/Vt01nft/arc-analytics) | Coming - real-time onchain analytics dashboard |
+| 1 | arc-mcp-server | Shipped - 21 tools for live Arc testnet access |
+| 2 | arc-job-board | This repo - live at arc-job-board.vercel.app |
+| 3 | multi-evaluator | Live on Arc Testnet - ERC-8183 hook, staked jury |
+| 4 | analytics | Live at arc-analytics-eight.vercel.app |
 
 Built for the [Arc Architects Program](https://arc.network).

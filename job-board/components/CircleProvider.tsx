@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -23,7 +24,6 @@ type CircleState = {
 type CircleCtx = CircleState & {
   signIn: (email: string) => Promise<void>;
   signOut: () => void;
-  /** PIN-sign a contract call through the Circle wallet. */
   execute: (params: {
     address: `0x${string}`;
     abi: readonly unknown[];
@@ -33,6 +33,9 @@ type CircleCtx = CircleState & {
 };
 
 const Ctx = createContext<CircleCtx | null>(null);
+// sessionStorage: survives refresh + in-tab navigation, clears when the tab
+// is closed. Matches "stay signed in until I sign out or close the page".
+const STORE_KEY = "arc_circle_email";
 
 export function useCircle(): CircleCtx {
   const c = useContext(Ctx);
@@ -50,11 +53,16 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
     walletId: string;
   } | null>(null);
 
-  const signIn = useCallback(async (rawEmail: string) => {
-    const id = rawEmail.trim().toLowerCase();
-    if (!id) throw new Error("Enter an email");
-    setStatus("connecting");
-    try {
+  // Establish (or re-establish) a session for an email. The Circle wallet
+  // already exists for a returning user, so a fresh userToken is minted
+  // silently with no PIN; PIN is only needed for first-time wallet creation
+  // (allowInit) and per-transaction signing.
+  const hydrate = useCallback(
+    async (rawEmail: string, allowInit: boolean) => {
+      const id = rawEmail.trim().toLowerCase();
+      if (!id) throw new Error("Enter an email");
+      setStatus("connecting");
+
       let s = await fetch("/api/circle/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,8 +73,8 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
       const appId: string = s.appId;
       setCircleAuth(appId, s.userToken, s.encryptionKey);
 
-      // First time: create the Arc wallet behind a PIN challenge.
       if (!s.wallets || s.wallets.length === 0) {
+        if (!allowInit) throw new Error("No Circle wallet for this email yet");
         const init = await fetch("/api/circle/initialize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -75,7 +83,6 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
         if (init.error) throw new Error(init.error);
         await executeChallenge(appId, init.challengeId); // Circle PIN UI
 
-        // Re-fetch to pick up the freshly created wallet.
         s = await fetch("/api/circle/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -91,13 +98,57 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
       setAddress(w.address);
       setEmail(id);
       setStatus("ready");
-    } catch (e) {
-      setStatus("signed-out");
-      throw e;
+      try {
+        sessionStorage.setItem(STORE_KEY, id);
+      } catch {
+        /* storage unavailable */
+      }
+    },
+    []
+  );
+
+  // Restore the session on every page load if the tab still has it.
+  useEffect(() => {
+    async function restore() {
+      let saved: string | null = null;
+      try {
+        saved = sessionStorage.getItem(STORE_KEY);
+      } catch {
+        saved = null;
+      }
+      if (!saved) return;
+      try {
+        await hydrate(saved, false);
+      } catch {
+        try {
+          sessionStorage.removeItem(STORE_KEY);
+        } catch {
+          /* ignore */
+        }
+        setStatus("signed-out");
+      }
     }
-  }, []);
+    restore();
+  }, [hydrate]);
+
+  const signIn = useCallback(
+    async (rawEmail: string) => {
+      try {
+        await hydrate(rawEmail, true);
+      } catch (e) {
+        setStatus("signed-out");
+        throw e;
+      }
+    },
+    [hydrate]
+  );
 
   const signOut = useCallback(() => {
+    try {
+      sessionStorage.removeItem(STORE_KEY);
+    } catch {
+      /* ignore */
+    }
     setSession(null);
     setAddress(null);
     setEmail(null);
