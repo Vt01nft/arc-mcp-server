@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { formatUnits } from "viem";
 import { useCircle } from "./CircleProvider";
+import { publicClient } from "@/lib/viem";
 
-// Match the RainbowKit Connect Wallet button's prominence
-// (dark-blue accent, light text, bold, rounded).
+// Match the RainbowKit Connect Wallet button's prominence.
 const btn: React.CSSProperties = {
   cursor: "pointer",
   background: "var(--accent)",
@@ -19,21 +20,73 @@ const btn: React.CSSProperties = {
   letterSpacing: "0.01em",
 };
 
+const chip: React.CSSProperties = {
+  cursor: "pointer",
+  background: "transparent",
+  color: "var(--ink)",
+  border: "1px solid var(--accent)",
+  borderRadius: 8,
+  padding: "8px 12px",
+  fontFamily: "var(--mono)",
+  fontSize: 12.5,
+  fontWeight: 600,
+  lineHeight: 1,
+};
+
 export function CircleButton() {
   const { status, address, email, signIn, signOut } = useCircle();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [bal, setBal] = useState<string | null>(null);
+
+  const refreshBal = async (addr: string) => {
+    try {
+      const wei = await publicClient.getBalance({
+        address: addr as `0x${string}`,
+      });
+      // USDC is the native gas token on Arc (18-decimal precision).
+      setBal(Number(formatUnits(wei, 18)).toFixed(3));
+    } catch {
+      setBal(null);
+    }
+  };
+
+  useEffect(() => {
+    if (status === "ready" && address) refreshBal(address);
+  }, [status, address]);
 
   if (status === "ready" && address) {
     return (
-      <button
-        title={`Circle wallet ${address} (${email})`}
-        onClick={signOut}
-        style={btn}
-      >
-        ◑ {address.slice(0, 6)}…{address.slice(-4)} · sign out
-      </button>
+      <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+        <button
+          style={chip}
+          title="Click to copy your full Circle wallet address"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(address);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            } catch {
+              /* clipboard blocked */
+            }
+          }}
+        >
+          ◑ {address.slice(0, 6)}…{address.slice(-4)}{" "}
+          {copied ? "✓ copied" : "⧉ copy"}
+        </button>
+        <button
+          style={{ ...chip, cursor: "default" }}
+          title={`Arc USDC balance for ${address} (${email}). Click to refresh.`}
+          onClick={() => refreshBal(address)}
+        >
+          {bal === null ? "… USDC" : `${bal} USDC`}
+        </button>
+        <button style={btn} onClick={signOut}>
+          Sign out
+        </button>
+      </span>
     );
   }
 
