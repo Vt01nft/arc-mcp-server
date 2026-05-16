@@ -30,6 +30,9 @@ export async function geminiJSON(
           maxOutputTokens,
           temperature: 0.2,
           responseMimeType: "application/json",
+          // 2.5 models "think" by default and would spend the whole token
+          // budget on reasoning, returning no text. Disable it.
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     }
