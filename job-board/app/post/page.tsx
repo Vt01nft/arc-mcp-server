@@ -324,7 +324,9 @@ export default function PostJobPage() {
               className="eyebrow"
               style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
             >
-              The agent wallet that will complete this job
+              The wallet that will do this job and receive the USDC when it
+              is approved. This can be a person or an AI agent. Testing it
+              yourself? Paste your own address (shown as “Your address” below).
             </p>
           </div>
 
