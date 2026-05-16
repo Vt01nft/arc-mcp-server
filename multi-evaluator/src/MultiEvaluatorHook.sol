@@ -18,8 +18,10 @@ contract MultiEvaluatorHook {
     uint256 public constant FEE_PERCENT = 5;     // 5% fee taken from job for jury
     uint256 public constant VOTE_WINDOW = 48 hours; // jury must vote within 48h
 
-    // ── References ────────────────────────────────────────────────────────────
+    // ── References / access control ───────────────────────────────────────────
     EvaluatorRegistry public immutable registry;
+    address public immutable owner;     // can set the authorized job contract
+    address public authorizedCaller;    // only this address may assign juries
 
     // ── Jury state ────────────────────────────────────────────────────────────
     enum Vote { Pending, Approve, Reject }
@@ -46,6 +48,15 @@ contract MultiEvaluatorHook {
     // ── Constructor ───────────────────────────────────────────────────────────
     constructor(address _registry) {
         registry = EvaluatorRegistry(_registry);
+        owner = msg.sender;
+        authorizedCaller = msg.sender; // owner until reassigned to the job contract
+    }
+
+    /// @notice Set the only address allowed to assign juries (the ERC-8183
+    ///         job contract in production). Owner-only.
+    function setAuthorizedCaller(address caller) external {
+        require(msg.sender == owner, "Only owner");
+        authorizedCaller = caller;
     }
 
     // ── ERC-8183 Hook interface ───────────────────────────────────────────────
@@ -55,6 +66,7 @@ contract MultiEvaluatorHook {
     /// @param jobId  ERC-8183 job ID
     /// @param amount Job value in native USDC (18 decimals)
     function onDeliverableSubmitted(uint256 jobId, uint256 amount) external {
+        require(msg.sender == authorizedCaller, "Unauthorized");
         require(juries[jobId].deadline == 0, "Jury already assigned");
 
         address[3] memory jurors = registry.selectJury(
@@ -65,6 +77,12 @@ contract MultiEvaluatorHook {
         jury.members = jurors;
         jury.deadline = block.timestamp + VOTE_WINDOW;
         jury.jobAmount = amount;
+
+        // Lock each juror's stake until the deadline so they cannot
+        // deregister mid-vote to escape a potential slash.
+        registry.lockEvaluator(jurors[0], jury.deadline);
+        registry.lockEvaluator(jurors[1], jury.deadline);
+        registry.lockEvaluator(jurors[2], jury.deadline);
 
         emit JuryAssigned(jobId, jurors, jury.deadline);
     }

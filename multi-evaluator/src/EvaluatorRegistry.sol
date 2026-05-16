@@ -23,6 +23,8 @@ contract EvaluatorRegistry {
 
     mapping(address => Evaluator) public evaluators;
     address[] public evaluatorList;
+    mapping(address => bool) private listed;        // prevents duplicate list entries
+    mapping(address => uint256) public lockedUntil; // jury duty stake lock
 
     // ── Events ────────────────────────────────────────────────────────────────
     event Registered(address indexed evaluator, uint256 stake);
@@ -53,7 +55,12 @@ contract EvaluatorRegistry {
             correctVotes: 0,
             active: true
         });
-        evaluatorList.push(msg.sender);
+        // Only add to the list once; re-registration must not create a
+        // duplicate (which would let one address hold multiple jury seats).
+        if (!listed[msg.sender]) {
+            listed[msg.sender] = true;
+            evaluatorList.push(msg.sender);
+        }
 
         emit Registered(msg.sender, msg.value);
     }
@@ -62,6 +69,7 @@ contract EvaluatorRegistry {
     function deregister() external {
         Evaluator storage ev = evaluators[msg.sender];
         require(ev.active, "Not registered");
+        require(block.timestamp >= lockedUntil[msg.sender], "Locked: on active jury");
         ev.active = false;
 
         uint256 stakeOut = ev.stake;
@@ -88,6 +96,12 @@ contract EvaluatorRegistry {
     function recordVote(address evaluator, bool wasCorrect) external onlyHook {
         evaluators[evaluator].totalVotes++;
         if (wasCorrect) evaluators[evaluator].correctVotes++;
+    }
+
+    /// @notice Hook locks a juror's stake until the voting deadline so they
+    ///         cannot deregister mid-jury to dodge slashing. Extend-only.
+    function lockEvaluator(address evaluator, uint256 until) external onlyHook {
+        if (until > lockedUntil[evaluator]) lockedUntil[evaluator] = until;
     }
 
     // ── View ──────────────────────────────────────────────────────────────────

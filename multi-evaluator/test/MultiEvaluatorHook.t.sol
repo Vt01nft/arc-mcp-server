@@ -149,6 +149,44 @@ contract MultiEvaluatorHookTest is Test {
         assertEq(alice.balance, before + 50 ether);
     }
 
+    // ── Security regression tests ─────────────────────────────────────────────
+
+    function test_OnDeliverableSubmittedUnauthorizedReverts() public {
+        _registerAll();
+        // alice is not the authorized caller (the test contract is)
+        vm.prank(alice);
+        vm.expectRevert("Unauthorized");
+        hook.onDeliverableSubmitted(1, JOB_VALUE);
+    }
+
+    function test_DeregisterLockedWhileOnJury() public {
+        _registerAll();
+        hook.onDeliverableSubmitted(1, JOB_VALUE);
+        (address[3] memory members,,,,,) = hook.getJury(1);
+
+        vm.prank(members[0]);
+        vm.expectRevert("Locked: on active jury");
+        registry.deregister();
+
+        // After the voting window the lock lifts
+        vm.warp(block.timestamp + 49 hours);
+        vm.prank(members[0]);
+        registry.deregister();
+        assertFalse(registry.isActive(members[0]));
+    }
+
+    function test_ReRegisterNoDuplicateJurySeat() public {
+        _registerAll();
+        vm.prank(alice);
+        registry.deregister();
+        vm.prank(alice);
+        registry.register{value: STAKE}();
+
+        assertEq(registry.activeCount(), 3);
+        address[3] memory jury = registry.selectJury(99);
+        assertTrue(jury[0] != jury[1] && jury[1] != jury[2] && jury[0] != jury[2]);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     function _registerAll() internal {

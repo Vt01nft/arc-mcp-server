@@ -127,9 +127,9 @@ forge script script/Deploy.s.sol --rpc-url arc_testnet --broadcast --private-key
 
 | Contract | Address |
 |---|---|
-| EvaluatorRegistry | `0x408857450Fb767E784BC08bD3c3AA2cd95d5dAc3` |
-| MultiEvaluatorHook | `0x5670d80ae8Aa66B5c5de904cdD1BBff17822bac9` |
-| VoteEscrow | `0xB624c5AF586D909d92Ad210e3f0c1b19085E5d95` |
+| EvaluatorRegistry | `0x3afe093483645eA3D82954F32Ff74A22A3cce2bd` |
+| MultiEvaluatorHook | `0x2DdF3599CAD71B5541eb8902819D78d3E29049C1` |
+| VoteEscrow | `0x7b59b4deBB8B986C639E81F4C3235366647bf640` |
 
 Verified on-chain: `EvaluatorRegistry.hook()` returns the deployed `MultiEvaluatorHook`
 address, confirming the nonce-predicted circular-dependency resolution held on a real chain.
