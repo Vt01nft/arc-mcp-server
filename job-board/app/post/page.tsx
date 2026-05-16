@@ -3,11 +3,49 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { zeroAddress, decodeEventLog } from "viem";
-import { ERC8183_ABI } from "@/contracts/abis";
+import { zeroAddress, decodeEventLog, parseUnits } from "viem";
+import { ERC8183_ABI, USDC_ABI } from "@/contracts/abis";
 import { ADDRESSES } from "@/contracts/addresses";
+import { publicClient } from "@/lib/viem";
 import { JOB_CATEGORIES, type JobCategory } from "@/lib/types";
 import { useCircle } from "@/components/CircleProvider";
+
+// After a Circle createJob (no receipt), find the new jobId by scanning back
+// from jobCounter for the job whose client + description match ours.
+async function resolveJobId(
+  client: string,
+  description: string
+): Promise<number | null> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      const counter = (await publicClient.readContract({
+        address: ADDRESSES.ERC8183_JOB,
+        abi: ERC8183_ABI,
+        functionName: "jobCounter",
+      })) as bigint;
+      for (let i = 0; i < 30; i++) {
+        const id = Number(counter) - i;
+        if (id <= 0) break;
+        const j = (await publicClient.readContract({
+          address: ADDRESSES.ERC8183_JOB,
+          abi: ERC8183_ABI,
+          functionName: "getJob",
+          args: [BigInt(id)],
+        })) as { client: string; description: string };
+        if (
+          j.client?.toLowerCase() === client.toLowerCase() &&
+          j.description === description
+        ) {
+          return id;
+        }
+      }
+    } catch {
+      /* retry */
+    }
+    await new Promise((r) => setTimeout(r, 2500)); // wait for the tx to mine
+  }
+  return null;
+}
 
 const EVALUATOR_ADDRESS = (
   process.env.NEXT_PUBLIC_EVALUATOR_ADDRESS ?? "0x3d1e88e762d8872365c050cde888729aec773eab"
@@ -21,6 +59,7 @@ export default function PostJobPage() {
     description: "",
     category: "General" as JobCategory,
     providerAddress: "",
+    amountUsdc: "",
     expiryHours: 72,
   });
   const [error, setError] = useState<string | null>(null);
@@ -110,9 +149,9 @@ export default function PostJobPage() {
     const expiryTimestamp =
       BigInt(Math.floor(Date.now() / 1000)) + BigInt(form.expiryHours * 3600);
 
-    // Circle wallet path: PIN-sign createJob via Circle, then save metadata.
-    // (Circle broadcasts async, so the chain jobId is resolved by the
-    // on-chain Browse fallback rather than from a receipt here.)
+    // Circle wallet path: PIN-sign createJob, resolve the new jobId, and (if
+    // an amount was given and you are also the provider) escrow it in the
+    // same flow: setBudget -> approve -> fund.
     if (circle.status === "ready") {
       setSaving(true);
       try {
@@ -128,18 +167,54 @@ export default function PostJobPage() {
             zeroAddress,
           ],
         });
+
+        const jobId = await resolveJobId(
+          circle.address as string,
+          form.description
+        );
+
+        const amount = form.amountUsdc.trim();
+        const wantEscrow =
+          jobId != null &&
+          Number(amount) > 0 &&
+          circle.address?.toLowerCase() ===
+            form.providerAddress.trim().toLowerCase();
+
+        if (wantEscrow) {
+          const raw = parseUnits(amount, 6); // USDC ERC-20 is 6 decimals
+          await circle.execute({
+            address: ADDRESSES.ERC8183_JOB,
+            abi: ERC8183_ABI,
+            functionName: "setBudget",
+            args: [BigInt(jobId!), raw, "0x"],
+          });
+          await circle.execute({
+            address: ADDRESSES.USDC,
+            abi: USDC_ABI,
+            functionName: "approve",
+            args: [ADDRESSES.ERC8183_JOB, raw],
+          });
+          await circle.execute({
+            address: ADDRESSES.ERC8183_JOB,
+            abi: ERC8183_ABI,
+            functionName: "fund",
+            args: [BigInt(jobId!), "0x"],
+          });
+        }
+
         await fetch("/api/jobs/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chainJobId: null,
+            chainJobId: jobId,
             description: form.description,
             category: form.category,
             clientAddress: circle.address,
             providerAddress: form.providerAddress,
           }),
         }).catch(() => {});
-        router.push("/jobs");
+
+        router.push(jobId != null ? `/jobs/${jobId}` : "/jobs");
       } catch (err) {
         setError((err as Error).message || "Circle transaction failed.");
       } finally {
@@ -250,6 +325,29 @@ export default function PostJobPage() {
               style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
             >
               The agent wallet that will complete this job
+            </p>
+          </div>
+
+          <div>
+            <label className="label">Escrow amount (USDC)</label>
+            <input
+              type="number"
+              name="amountUsdc"
+              value={form.amountUsdc}
+              onChange={handleChange}
+              min={0}
+              step="0.01"
+              placeholder="e.g. 0.5"
+              className="field"
+            />
+            <p
+              className="eyebrow"
+              style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
+            >
+              If you set this and your wallet is also the provider address, the
+              USDC is escrowed now (set budget, approve, fund) in one flow.
+              Otherwise leave it blank and the provider sets the price, then you
+              fund from the job page.
             </p>
           </div>
 

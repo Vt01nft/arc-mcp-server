@@ -58,17 +58,22 @@ export default function JobDetailPage() {
 
   // One write path for both wallets. Circle is primary (only login now);
   // wagmi remains a fallback if a wallet is ever connected.
-  async function act(p: {
-    address: `0x${string}`;
-    abi: readonly unknown[];
-    functionName: string;
-    args: readonly unknown[];
-  }) {
+  async function act(
+    p: {
+      address: `0x${string}`;
+      abi: readonly unknown[];
+      functionName: string;
+      args: readonly unknown[];
+    },
+    onDone?: () => Promise<void>
+  ) {
     if (circleReady) {
       await circle.execute(p);
+      if (onDone) await onDone().catch(() => {});
       window.location.reload();
     } else {
       writeContract(p as Parameters<typeof writeContract>[0]);
+      if (onDone) onDone().catch(() => {});
     }
   }
 
@@ -464,16 +469,31 @@ export default function JobDetailPage() {
           <button
             disabled={!deliverableInput || isTxPending}
             onClick={() =>
-              act({
-                address: ADDRESSES.ERC8183_JOB,
-                abi: ERC8183_ABI,
-                functionName: "submit",
-                args: [
-                  BigInt(chain.id),
-                  keccak256(toBytes(deliverableInput)),
-                  "0x",
-                ],
-              })
+              act(
+                {
+                  address: ADDRESSES.ERC8183_JOB,
+                  abi: ERC8183_ABI,
+                  functionName: "submit",
+                  args: [
+                    BigInt(chain.id),
+                    keccak256(toBytes(deliverableInput)),
+                    "0x",
+                  ],
+                },
+                // Save the readable deliverable off-chain so the client and
+                // evaluator can actually see the work on this page.
+                async () => {
+                  await fetch("/api/jobs/deliverable", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      chainJobId: chain.id,
+                      content: deliverableInput,
+                      hash: keccak256(toBytes(deliverableInput)),
+                    }),
+                  });
+                }
+              )
             }
             className="btn btn-primary"
             style={{ alignSelf: "flex-start" }}
