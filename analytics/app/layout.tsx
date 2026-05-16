@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Arc Analytics - Live Testnet Dashboard",
-  description: "Real-time ERC-8183 job analytics and event feed for Arc Testnet, narrated by Claude.",
+  description: "Real-time ERC-8183 job analytics and event feed for Arc Testnet, narrated by Gemini.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

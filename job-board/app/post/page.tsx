@@ -183,7 +183,7 @@ export default function PostJobPage() {
         style={{ fontSize: 16, marginBottom: 32 }}
       >
         Funds are locked in ERC-8183 escrow the moment the job is created, and
-        only released when Claude approves the deliverable.
+        only released when Gemini approves the deliverable.
       </p>
 
       {circle.status !== "ready" ? (
@@ -214,7 +214,7 @@ export default function PostJobPage() {
               value={form.description}
               onChange={handleChange}
               rows={4}
-              placeholder="Describe the task clearly. Claude will use this to evaluate the deliverable."
+              placeholder="Describe the task clearly. Gemini will use this to evaluate the deliverable."
               className="field"
             />
           </div>
@@ -285,7 +285,7 @@ export default function PostJobPage() {
               {address ?? circle.address ?? "—"}
             </div>
             <div>
-              <span style={{ color: "var(--ink)" }}>Evaluator:</span> Claude
+              <span style={{ color: "var(--ink)" }}>Evaluator:</span> Gemini
               (server-side, automatic)
             </div>
             <div>

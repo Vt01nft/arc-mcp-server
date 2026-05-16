@@ -10,7 +10,7 @@ Arc is a stablecoin-native Layer 1 blockchain built by Circle, where USDC is the
 
 Most blockchain projects ship demos. This ships working infrastructure.
 
-Four phases. One monorepo. Every tool connects to Arc Testnet right now and does something real: reads live chain data, creates escrow jobs, evaluates deliverables using Claude, votes on outcomes with a 3-agent jury, and visualizes everything on a live dashboard.
+Four phases. One monorepo. Every tool connects to Arc Testnet right now and does something real: reads live chain data, creates escrow jobs, evaluates deliverables using Gemini, votes on outcomes with a 3-agent jury, and visualizes everything on a live dashboard.
 
 The goal is to show the Arc and Circle teams what becomes possible when you combine ERC-8183 job escrow, ERC-8004 agent identity, and AI evaluation in a single coherent stack.
 
@@ -23,7 +23,7 @@ The goal is to show the Arc and Circle teams what becomes possible when you comb
 | 1 | `/` | MCP server - 21 tools for live Arc Testnet access | Live |
 | 2 | `/job-board` | Job marketplace where humans post tasks and AI agents complete them | Live: [arc-job-board.vercel.app](https://arc-job-board.vercel.app) |
 | 3 | `/multi-evaluator` | Smart contracts that replace a single evaluator with a 3-agent jury | Live on Arc Testnet |
-| 4 | `/analytics` | Live dashboard that tracks all onchain job activity and narrates it with Claude | Live: [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app) |
+| 4 | `/analytics` | Live dashboard that tracks all onchain job activity and narrates it with Gemini | Live: [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app) |
 
 ---
 
@@ -66,7 +66,7 @@ This runs a live smoke test against Arc Testnet and prints real data including c
 
 **Live:** [arc-job-board.vercel.app](https://arc-job-board.vercel.app)
 
-**What it does:** A Next.js web application where anyone can post a job with a USDC bounty and let the onchain escrow contract settle it. When the provider submits their deliverable, Claude evaluates it and gives a recommendation, then the evaluator approves or rejects onchain, releasing or refunding the USDC.
+**What it does:** A Next.js web application where anyone can post a job with a USDC bounty and let the onchain escrow contract settle it. When the provider submits their deliverable, Gemini evaluates it and gives a recommendation, then the evaluator approves or rejects onchain, releasing or refunding the USDC.
 
 The deployed ERC-8183 contract is `AgenticCommerce` (an upgradeable proxy at `0x0747EEf0706327138c69792bF28Cd525089e4583`, implementation `0xa316fd02827242d537f84730f8a37d0ba5fd351a`). The app's ABI is taken verbatim from the verified contract on ArcScan, not hand-written.
 
@@ -75,7 +75,7 @@ The deployed ERC-8183 contract is `AgenticCommerce` (an upgradeable proxy at `0x
 2. Provider calls `setBudget` to quote the USDC price for the job
 3. Client `approve`s USDC then calls `fund`, which pulls the budget into escrow via `transferFrom` and moves the job to Funded
 4. Provider calls `submit` with the deliverable hash
-5. Claude evaluates the deliverable against the description (`POST /api/evaluate`)
+5. Gemini evaluates the deliverable against the description (`POST /api/evaluate`)
 6. Evaluator calls `complete` (pays the provider) or `reject` (refunds the client)
 
 Browse Jobs reads Supabase metadata merged with an onchain fallback (jobs whose offchain save failed still appear, scanned from `JobCreated` logs).
@@ -143,14 +143,14 @@ address, confirming the nonce-predicted circular-dependency resolution held on a
 
 **The problem:** There is no easy way to see what is happening on Arc Testnet at a glance, and no tool that explains trends in plain language.
 
-**What it does:** A live dashboard that syncs the deployed AgenticCommerce (ERC-8183) events from Arc Testnet into Supabase, displays them as bar charts and an event feed, and lets you ask Claude to narrate the current state of the ecosystem in two sentences. It shows total jobs, USDC volume, active escrows, and daily activity trends across the whole shared contract, not just this app's jobs.
+**What it does:** A live dashboard that syncs the deployed AgenticCommerce (ERC-8183) events from Arc Testnet into Supabase, displays them as bar charts and an event feed, and lets you ask Gemini to narrate the current state of the ecosystem in two sentences. It shows total jobs, USDC volume, active escrows, and daily activity trends across the whole shared contract, not just this app's jobs.
 
 **Key features:**
 - Sync pulls the last ~50,000 blocks of events in paginated chunks, deduped before upsert; a Vercel Cron re-syncs daily and `POST /api/sync` triggers it on demand
 - Event signatures are taken from the verified onchain contract (a wrong signature changes the log topic and silently returns nothing)
 - Bar chart shows daily job creation, completion, and rejection counts
 - Live event feed shows the most recent onchain activity with block numbers and transaction links
-- Claude narration generates a headline and two-sentence summary of current ecosystem health
+- Gemini narration generates a headline and two-sentence summary of current ecosystem health
 
 **Run locally:**
 

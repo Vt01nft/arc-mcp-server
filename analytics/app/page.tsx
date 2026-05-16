@@ -91,12 +91,12 @@ export default function DashboardPage() {
             disabled={narrating || !stats}
             className="px-3 py-1.5 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-lg transition-colors disabled:opacity-40"
           >
-            {narrating ? "Narrating…" : "Narrate with Claude"}
+            {narrating ? "Narrating…" : "Narrate with Gemini"}
           </button>
         </div>
       </div>
 
-      {/* Claude narration */}
+      {/* Gemini narration */}
       {narration && <NarrationCard narration={narration} />}
 
       {/* Stats grid */}

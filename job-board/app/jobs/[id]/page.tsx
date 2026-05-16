@@ -348,7 +348,7 @@ export default function JobDetailPage() {
           {chain.status === 2 &&
             (isEvaluator
               ? "Your move: you are the evaluator. Review and approve or reject below."
-              : "Next: Claude evaluates and the evaluator approves or rejects.")}
+              : "Next: Gemini evaluates and the evaluator approves or rejects.")}
           {chain.status === 3 && "Done. USDC was released to the provider."}
           {chain.status === 4 && "Closed. USDC was refunded to the client."}
           {chain.status === 5 && "Expired. The client can claim a refund."}
@@ -567,7 +567,7 @@ export default function JobDetailPage() {
             </div>
           )}
 
-          {/* Trigger Claude evaluation */}
+          {/* Trigger Gemini evaluation */}
           {!activeEvaluation && (
             <button
               onClick={handleEvaluate}
@@ -575,11 +575,11 @@ export default function JobDetailPage() {
               className="btn btn-ghost"
               style={{ alignSelf: "flex-start" }}
             >
-              {evaluating ? "Evaluating…" : "Evaluate with Claude"}
+              {evaluating ? "Evaluating…" : "Evaluate with Gemini"}
             </button>
           )}
 
-          {/* Claude result */}
+          {/* Gemini result */}
           {activeEvaluation && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div
@@ -593,7 +593,7 @@ export default function JobDetailPage() {
                   }`}
                 >
                   <span className="pill" />
-                  Claude:{" "}
+                  Gemini:{" "}
                   {activeEvaluation.decision === "approve"
                     ? "Approve"
                     : "Reject"}
@@ -615,7 +615,7 @@ export default function JobDetailPage() {
             </div>
           )}
 
-          {/* Approve / Reject - evaluator only, after Claude evaluates */}
+          {/* Approve / Reject - evaluator only, after Gemini evaluates */}
           {isEvaluator && activeEvaluation && (
             <div
               style={{

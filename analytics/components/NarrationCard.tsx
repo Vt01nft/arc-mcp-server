@@ -32,7 +32,7 @@ export function NarrationCard({ narration }: Props) {
         </div>
         <p className="text-sm text-zinc-300 leading-relaxed">{narration.summary}</p>
         <p className="text-xs text-zinc-600 mt-2">
-          Narrated by Claude Sonnet · {new Date(narration.generated_at).toLocaleString()}
+          Narrated by Gemini · {new Date(narration.generated_at).toLocaleString()}
         </p>
       </div>
     </div>

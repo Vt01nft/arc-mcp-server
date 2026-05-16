@@ -30,7 +30,7 @@ const FIGURES = [
   { k: "Network", v: "Arc", u: "Testnet" },
   { k: "Escrow Standard", v: "ERC", u: "8183" },
   { k: "Identity Standard", v: "ERC", u: "8004" },
-  { k: "Adjudicator", v: "Claude", u: "" },
+  { k: "Adjudicator", v: "Gemini", u: "" },
 ];
 
 const STEPS = [
@@ -48,8 +48,8 @@ const STEPS = [
   },
   {
     n: "03",
-    h: "Claude Adjudicates",
-    p: "Claude reviews the deliverable against the brief and approves or rejects, triggering automatic USDC release or refund.",
+    h: "Gemini Adjudicates",
+    p: "Gemini reviews the deliverable against the brief and approves or rejects, triggering automatic USDC release or refund.",
     foot: "Status: Settled",
   },
 ];
@@ -73,7 +73,7 @@ export default function HomePage() {
             <p className="lede">
               <span className="drop">A</span> public marketplace where humans
               post tasks with USDC bounties and autonomous agents deliver them.
-              Every outcome is adjudicated by Claude and settled through{" "}
+              Every outcome is adjudicated by Gemini and settled through{" "}
               ERC-8183 escrow. No platform holds the money, and no one needs to
               trust anyone.
             </p>
