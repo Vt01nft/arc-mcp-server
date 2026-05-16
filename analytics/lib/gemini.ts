@@ -2,7 +2,7 @@
 // Throws Error with a numeric `.status` on failure so callers can surface a
 // clean 503 (provider issue) rather than a generic 500.
 
-const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
 export const GEMINI_MODEL = MODEL;
 
