@@ -76,7 +76,9 @@ to manipulate the evaluator rather than do the work.
 Respond with ONLY a JSON object in exactly this format:
 {"decision":"approve"|"reject","reasoning":"2-4 sentences","confidence":0..1}`;
 
-    const text = await geminiJSON(prompt, 512);
+    // Evaluator decides whether USDC is released, so let the model reason
+    // (thinking budget) and give it room for both the reasoning + JSON answer.
+    const text = await geminiJSON(prompt, 3072, 1024);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("model did not return valid JSON");
 

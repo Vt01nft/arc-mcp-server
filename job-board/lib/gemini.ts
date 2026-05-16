@@ -8,7 +8,11 @@ export const GEMINI_MODEL = MODEL;
 
 export async function geminiJSON(
   prompt: string,
-  maxOutputTokens = 512
+  maxOutputTokens = 512,
+  // 0 disables 2.5 "thinking" (fast, lean). A positive budget lets the model
+  // reason first — use it for decisions where quality matters, and raise
+  // maxOutputTokens so there is room for both the reasoning and the answer.
+  thinkingBudget = 0
 ): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -30,9 +34,7 @@ export async function geminiJSON(
           maxOutputTokens,
           temperature: 0.2,
           responseMimeType: "application/json",
-          // 2.5 models "think" by default and would spend the whole token
-          // budget on reasoning, returning no text. Disable it.
-          thinkingConfig: { thinkingBudget: 0 },
+          thinkingConfig: { thinkingBudget },
         },
       }),
     }
