@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { geminiJSON } from "@/lib/gemini";
 import type { StatsSnapshot, DailyStat, NarrationResponse } from "@/lib/types";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,13 +43,7 @@ Write a CONCISE 2-sentence headline + summary for developers following Arc ecosy
 Reply in this exact JSON format (no markdown, no explanation):
 {"headline":"max 10 words","summary":"2-sentence summary","trend":"up"|"down"|"neutral"}`;
 
-    const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 256,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const raw = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    const raw = await geminiJSON(prompt, 256);
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("model did not return JSON");
     const parsed = JSON.parse(match[0]) as Partial<NarrationResponse>;
@@ -78,7 +70,9 @@ Reply in this exact JSON format (no markdown, no explanation):
     const e = err as { status?: number; message?: string };
     const providerIssue =
       typeof e?.status === "number" ||
-      /anthropic|credit balance|rate limit|overloaded/i.test(e?.message ?? "");
+      /gemini|quota|api key|credit|rate limit|overloaded|unavailable/i.test(
+        e?.message ?? ""
+      );
     return NextResponse.json(
       {
         error: providerIssue
