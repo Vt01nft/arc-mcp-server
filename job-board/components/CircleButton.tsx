@@ -3,6 +3,22 @@
 import { useState } from "react";
 import { useCircle } from "./CircleProvider";
 
+// Match the RainbowKit Connect Wallet button's prominence
+// (dark-blue accent, light text, bold, rounded).
+const btn: React.CSSProperties = {
+  cursor: "pointer",
+  background: "var(--accent)",
+  color: "var(--paper)",
+  border: 0,
+  borderRadius: 8,
+  padding: "9px 16px",
+  fontFamily: "var(--sans)",
+  fontSize: 14,
+  fontWeight: 700,
+  lineHeight: 1,
+  letterSpacing: "0.01em",
+};
+
 export function CircleButton() {
   const { status, address, email, signIn, signOut } = useCircle();
   const [open, setOpen] = useState(false);
@@ -12,10 +28,9 @@ export function CircleButton() {
   if (status === "ready" && address) {
     return (
       <button
-        className="mast-link"
         title={`Circle wallet ${address} (${email})`}
         onClick={signOut}
-        style={{ cursor: "pointer", background: "none", border: 0 }}
+        style={btn}
       >
         ◑ {address.slice(0, 6)}…{address.slice(-4)} · sign out
       </button>
@@ -24,11 +39,7 @@ export function CircleButton() {
 
   if (!open) {
     return (
-      <button
-        className="mast-link"
-        onClick={() => setOpen(true)}
-        style={{ cursor: "pointer", background: "none", border: 0 }}
-      >
+      <button onClick={() => setOpen(true)} style={btn}>
         ◑ Sign in with Circle
       </button>
     );
@@ -42,12 +53,11 @@ export function CircleButton() {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         className="field"
-        style={{ height: 30, padding: "0 8px", width: 170 }}
+        style={{ height: 34, padding: "0 8px", width: 170 }}
       />
       <button
-        className="mast-link"
         disabled={status === "connecting"}
-        style={{ cursor: "pointer", background: "none", border: 0 }}
+        style={{ ...btn, opacity: status === "connecting" ? 0.6 : 1 }}
         onClick={async () => {
           setErr(null);
           try {
@@ -60,9 +70,7 @@ export function CircleButton() {
       >
         {status === "connecting" ? "…" : "Go"}
       </button>
-      {err && (
-        <span style={{ color: "var(--bad)", fontSize: 10 }}>{err}</span>
-      )}
+      {err && <span style={{ color: "var(--bad)", fontSize: 10 }}>{err}</span>}
     </span>
   );
 }
