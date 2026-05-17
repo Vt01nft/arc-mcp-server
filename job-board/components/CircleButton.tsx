@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { formatUnits } from "viem";
+import { useState } from "react";
 import { useCircle } from "./CircleProvider";
-import { publicClient } from "@/lib/viem";
 
 // Match the RainbowKit Connect Wallet button's prominence.
 const btn: React.CSSProperties = {
@@ -34,28 +32,12 @@ const chip: React.CSSProperties = {
 };
 
 export function CircleButton() {
-  const { status, address, email, signIn, signOut } = useCircle();
+  const { status, address, email, balance, signIn, signOut, refreshBalance } =
+    useCircle();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [bal, setBal] = useState<string | null>(null);
-
-  const refreshBal = async (addr: string) => {
-    try {
-      const wei = await publicClient.getBalance({
-        address: addr as `0x${string}`,
-      });
-      // USDC is the native gas token on Arc (18-decimal precision).
-      setBal(Number(formatUnits(wei, 18)).toFixed(3));
-    } catch {
-      setBal(null);
-    }
-  };
-
-  useEffect(() => {
-    if (status === "ready" && address) refreshBal(address);
-  }, [status, address]);
 
   if (status === "ready" && address) {
     return (
@@ -79,9 +61,9 @@ export function CircleButton() {
         <button
           style={{ ...chip, cursor: "default" }}
           title={`Arc USDC balance for ${address} (${email}). Click to refresh.`}
-          onClick={() => refreshBal(address)}
+          onClick={() => refreshBalance()}
         >
-          {bal === null ? "… USDC" : `${bal} USDC`}
+          {balance === null ? "… USDC" : `${balance} USDC`}
         </button>
         <button style={btn} onClick={signOut}>
           Sign out

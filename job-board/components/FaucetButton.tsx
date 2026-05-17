@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useCircle } from "./CircleProvider";
 
 export function FaucetButton() {
-  const { address } = useCircle();
+  const { address, refreshBalance } = useCircle();
   const [open, setOpen] = useState(false);
   const [addr, setAddr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,6 +25,13 @@ export function FaucetButton() {
         body: JSON.stringify({ address: value }),
       }).then((x) => x.json());
       setMsg(r.message ?? (r.ok ? "Requested." : "Failed."));
+      if (r.ok) {
+        // Reflect the new balance without a page refresh (tx mines in a
+        // few seconds, so poll a few times).
+        refreshBalance();
+        setTimeout(() => refreshBalance(), 4000);
+        setTimeout(() => refreshBalance(), 9000);
+      }
       if (r.fallback && r.faucetUrl) {
         setFallbackUrl(r.faucetUrl);
         try {
@@ -70,7 +77,7 @@ export function FaucetButton() {
         onClick={request}
         style={{ cursor: "pointer", background: "none", border: 0 }}
       >
-        {busy ? "…" : "Get USDC"}
+        {busy ? "…" : "Get Faucet"}
       </button>
       {fallbackUrl && (
         <a

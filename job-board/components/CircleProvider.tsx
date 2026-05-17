@@ -14,16 +14,20 @@ import {
   abiFunctionSignature,
   serializeAbiParams,
 } from "@/lib/circle-client";
+import { formatUnits } from "viem";
+import { publicClient } from "@/lib/viem";
 
 type CircleState = {
   status: "signed-out" | "connecting" | "ready";
   email: string | null;
   address: string | null;
+  balance: string | null; // native Arc USDC, 3dp string
 };
 
 type CircleCtx = CircleState & {
   signIn: (email: string) => Promise<void>;
   signOut: () => void;
+  refreshBalance: () => Promise<void>;
   execute: (params: {
     address: `0x${string}`;
     abi: readonly unknown[];
@@ -47,11 +51,26 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<CircleState["status"]>("signed-out");
   const [email, setEmail] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
   const [session, setSession] = useState<{
     appId: string;
     userToken: string;
     walletId: string;
   } | null>(null);
+
+  async function fetchBal(addr: string) {
+    try {
+      const wei = await publicClient.getBalance({
+        address: addr as `0x${string}`,
+      });
+      setBalance(Number(formatUnits(wei, 18)).toFixed(3));
+    } catch {
+      /* leave previous */
+    }
+  }
+  const refreshBalance = useCallback(async () => {
+    if (address) await fetchBal(address);
+  }, [address]);
 
   // Establish (or re-establish) a session for an email. The Circle wallet
   // already exists for a returning user, so a fresh userToken is minted
@@ -98,6 +117,7 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
       setAddress(w.address);
       setEmail(id);
       setStatus("ready");
+      fetchBal(w.address);
       try {
         sessionStorage.setItem(STORE_KEY, id);
       } catch {
@@ -151,6 +171,7 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
     }
     setSession(null);
     setAddress(null);
+    setBalance(null);
     setEmail(null);
     setStatus("signed-out");
   }, []);
@@ -176,8 +197,17 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<CircleCtx>(
-    () => ({ status, email, address, signIn, signOut, execute }),
-    [status, email, address, signIn, signOut, execute]
+    () => ({
+      status,
+      email,
+      address,
+      balance,
+      signIn,
+      signOut,
+      refreshBalance,
+      execute,
+    }),
+    [status, email, address, balance, signIn, signOut, refreshBalance, execute]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

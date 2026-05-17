@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAddress } from "viem";
+import { isAddress, parseUnits, formatUnits } from "viem";
+import { publicClient, getWalletClient } from "@/lib/viem";
 
-// Attempts a Circle testnet drip for ARC-TESTNET. The W3S key currently
-// lacks faucet scope (Circle returns 403), so this usually responds with a
-// graceful fallback telling the client to use the official faucet with the
-// address it already has. If a faucet-scoped key is set, it just works.
+// Project-run testnet faucet: the server signs a native USDC transfer from
+// the project treasury to the recipient. Circle's hosted faucet API is gated
+// for our W3S key (403), so we dispense directly. Arc's native gas token is
+// USDC (18 decimals); a value transfer credits spendable USDC for gas and
+// for ERC-8183 escrow.
+const DRIP = parseUnits("2", 18); // 2 USDC per request
+const CAP = parseUnits("5", 18); // skip if recipient already has >= 5 USDC
+
 export async function POST(req: NextRequest) {
   try {
     const { address } = (await req.json()) as { address?: string };
@@ -15,52 +20,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const key = process.env.CIRCLE_API_KEY;
-    if (!key) {
+    const bal = await publicClient.getBalance({
+      address: address as `0x${string}`,
+    });
+    if (bal >= CAP) {
       return NextResponse.json({
         ok: false,
-        fallback: true,
-        message: "Faucet not configured. Use the Circle faucet.",
-        faucetUrl: "https://faucet.circle.com",
+        message: `You already have ${Number(formatUnits(bal, 18)).toFixed(
+          2
+        )} USDC. Faucet skipped (cap 5).`,
       });
     }
 
-    const res = await fetch("https://api.circle.com/v1/faucet/drips", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        address,
-        blockchain: "ARC-TESTNET",
-        usdc: true,
-        native: true,
-      }),
+    const wallet = getWalletClient();
+    const treasury = await publicClient.getBalance({
+      address: wallet.account.address,
+    });
+    if (treasury < DRIP) {
+      return NextResponse.json(
+        {
+          ok: false,
+          fallback: true,
+          faucetUrl: "https://faucet.circle.com",
+          message: "Faucet treasury is low. Use the Circle faucet for now.",
+        },
+        { status: 503 }
+      );
+    }
+
+    const hash = await wallet.sendTransaction({
+      to: address as `0x${string}`,
+      value: DRIP,
     });
 
-    if (res.ok) {
-      return NextResponse.json({
-        ok: true,
-        message: "Test USDC requested. It should arrive shortly.",
-      });
-    }
-
-    // Expected path with the W3S key: gated. Degrade gracefully.
     return NextResponse.json({
-      ok: false,
-      fallback: true,
-      message:
-        "Circle's programmatic faucet is gated for this key. Your address is ready below, open the Circle faucet and paste it.",
-      faucetUrl: "https://faucet.circle.com",
+      ok: true,
+      hash,
+      amount: "2",
+      message: "2 USDC sent. Arriving in a few seconds.",
     });
-  } catch {
+  } catch (err) {
+    const m = err instanceof Error ? err.message : String(err);
+    console.error("Faucet error:", m);
     return NextResponse.json(
       {
         ok: false,
         fallback: true,
-        message: "Faucet request failed. Use the Circle faucet.",
         faucetUrl: "https://faucet.circle.com",
+        message: "Faucet failed. Use the Circle faucet.",
       },
       { status: 502 }
     );
