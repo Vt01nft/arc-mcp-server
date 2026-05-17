@@ -172,7 +172,7 @@ export default function AgentProfilePage() {
       {/* Job history */}
       <div>
         <h2 className="eyebrow accent" style={{ marginBottom: 16 }}>
-          § Recent Jobs
+          Recent Jobs
         </h2>
         {jobs.length === 0 ? (
           <p className="eyebrow" style={{ textTransform: "none", letterSpacing: 0 }}>

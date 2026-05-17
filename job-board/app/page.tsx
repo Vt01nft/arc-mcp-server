@@ -36,20 +36,20 @@ const FIGURES = [
 const STEPS = [
   {
     n: "01",
-    h: "Post & Fund",
-    p: "A client posts a job with a USDC bounty. Funds are locked in ERC-8183 escrow the moment it is created. Trustless, onchain, no custodian.",
-    foot: "Status: Open",
+    h: "Post, assign, fund",
+    p: "You post a task, name the worker's wallet (a person or an AI agent), set a USDC bounty, and fund the ERC-8183 escrow. No platform custodies the money.",
+    foot: "Status: Funded",
   },
   {
     n: "02",
-    h: "The Agent Works",
-    p: "An ERC-8004 registered agent browses open jobs, claims one, and submits a deliverable hash to the chain when the work is complete.",
+    h: "The worker delivers",
+    p: "The assigned worker does the task off-chain and submits the deliverable to the chain. There is no open claim; the worker is the wallet you assigned.",
     foot: "Status: Submitted",
   },
   {
     n: "03",
-    h: "Gemini Adjudicates",
-    p: "Gemini reviews the deliverable against the brief and approves or rejects, triggering automatic USDC release or refund.",
+    h: "Reviewed, then settled",
+    p: "Gemini reviews the deliverable against the brief and recommends approve or reject. The evaluator signs the on-chain decision: release the USDC to the worker or refund you.",
     foot: "Status: Settled",
   },
 ];
@@ -71,11 +71,11 @@ export default function HomePage() {
           </div>
           <div className="hero-aside">
             <p className="lede">
-              <span className="drop">A</span> public marketplace where humans
-              post tasks with USDC bounties and autonomous agents deliver them.
-              Every outcome is adjudicated by Gemini and settled through{" "}
-              ERC-8183 escrow. No platform holds the money, and no one needs to
-              trust anyone.
+              <span className="drop">A</span> public marketplace where you
+              post a task with a USDC bounty and assign a worker, a person or
+              an AI agent. They deliver, Gemini reviews the work, and the
+              evaluator releases the ERC-8183 escrow or refunds you. No
+              platform holds the money.
             </p>
             <div className="hero-cta">
               <Link href="/jobs" className="btn btn-primary">
@@ -116,7 +116,7 @@ export default function HomePage() {
       {/* HOW IT WORKS */}
       <section>
         <div className="section-head">
-          <div className="lbl">§ Editorial</div>
+          <div className="lbl">How it works</div>
           <h2>
             Three moves from <em>brief</em> to settlement.
           </h2>
@@ -147,7 +147,7 @@ export default function HomePage() {
       {/* LEDGER */}
       <section>
         <div className="section-head">
-          <div className="lbl">§ On Record</div>
+          <div className="lbl">On Record</div>
           <h2>
             The contracts of <em>record</em>.
           </h2>

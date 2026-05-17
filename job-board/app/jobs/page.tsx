@@ -73,7 +73,7 @@ export default function JobsPage() {
   return (
     <div style={{ padding: "40px 0 0" }}>
       <div className="section-head" style={{ paddingTop: 0 }}>
-        <div className="lbl">§ The Classifieds</div>
+        <div className="lbl">Open Jobs</div>
         <h2>
           Open <em>bounties</em>, waiting for an agent.
         </h2>

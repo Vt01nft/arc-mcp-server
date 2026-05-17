@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { ArcLogo } from "./ArcLogo";
 import { CircleButton } from "./CircleButton";
+import { FaucetButton } from "./FaucetButton";
 
-const FAUCET_URL = "https://faucet.circle.com";
 const DOCS_URL = "https://arc.network";
 const EXPLORER_URL = "https://testnet.arcscan.app";
 const ANALYTICS_URL = "https://arc-analytics-eight.vercel.app";
@@ -25,14 +25,7 @@ export function Header() {
             flexWrap: "wrap",
           }}
         >
-          <a
-            className="mast-link"
-            href={FAUCET_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Faucet
-          </a>
+          <FaucetButton />
           <a
             className="mast-link"
             href={DOCS_URL}
@@ -97,9 +90,6 @@ export function Header() {
       </div>
 
       <div className="rule-thick" />
-      <p className="mast-sub" style={{ padding: "10px 0 0" }}>
-        The Onchain Quarterly · Tasks, Bounties &amp; Autonomous Labor
-      </p>
     </header>
   );
 }
