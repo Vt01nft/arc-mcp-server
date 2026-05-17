@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAddress, parseUnits, formatUnits } from "viem";
+import { isAddress, parseUnits } from "viem";
 import { publicClient, getWalletClient } from "@/lib/viem";
 
 // Project-run testnet faucet: the server signs a native USDC transfer from
@@ -8,7 +8,6 @@ import { publicClient, getWalletClient } from "@/lib/viem";
 // USDC (18 decimals); a value transfer credits spendable USDC for gas and
 // for ERC-8183 escrow.
 const DRIP = parseUnits("2", 18); // 2 USDC per request
-const CAP = parseUnits("5", 18); // skip if recipient already has >= 5 USDC
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,18 +17,6 @@ export async function POST(req: NextRequest) {
         { ok: false, message: "Enter a valid 0x wallet address." },
         { status: 400 }
       );
-    }
-
-    const bal = await publicClient.getBalance({
-      address: address as `0x${string}`,
-    });
-    if (bal >= CAP) {
-      return NextResponse.json({
-        ok: false,
-        message: `You already have ${Number(formatUnits(bal, 18)).toFixed(
-          2
-        )} USDC. Faucet skipped (cap 5).`,
-      });
     }
 
     const wallet = getWalletClient();
