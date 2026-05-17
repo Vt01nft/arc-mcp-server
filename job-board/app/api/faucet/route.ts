@@ -1,13 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAddress, parseUnits } from "viem";
+import { isAddress, parseUnits, formatUnits } from "viem";
 import { publicClient, getWalletClient } from "@/lib/viem";
 
-// Project-run testnet faucet: the server signs a native USDC transfer from
-// the project treasury to the recipient. Circle's hosted faucet API is gated
-// for our W3S key (403), so we dispense directly. Arc's native gas token is
-// USDC (18 decimals); a value transfer credits spendable USDC for gas and
-// for ERC-8183 escrow.
-const DRIP = parseUnits("2", 18); // 2 USDC per request
+// Faucet policy: only top up wallets that are low (< 5 USDC), and give 5 USDC.
+// Primary source is Circle's own faucet API (Circle-funded). Circle heavily
+// rate-limits it, so on 429/error we fall back to a project treasury transfer
+// so the user is never blocked.
+const THRESHOLD = parseUnits("5", 18); // only dispense if balance < 5 USDC
+const DRIP = parseUnits("5", 18); // treasury fallback amount: 5 USDC
+
+async function tryCircle(address: string): Promise<boolean> {
+  const key = process.env.CIRCLE_API_KEY;
+  if (!key) return false;
+  try {
+    const res = await fetch("https://api.circle.com/v1/faucet/drips", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        address,
+        blockchain: "ARC-TESTNET",
+        native: true,
+        usdc: true,
+      }),
+    });
+    return res.ok; // 2xx = Circle accepted the drip
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +42,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const bal = await publicClient.getBalance({
+      address: address as `0x${string}`,
+    });
+    if (bal >= THRESHOLD) {
+      return NextResponse.json({
+        ok: false,
+        message: `You already have ${Number(formatUnits(bal, 18)).toFixed(
+          2
+        )} USDC. The faucet only tops up wallets below 5 USDC.`,
+      });
+    }
+
+    // 1) Primary: Circle's own faucet (Circle-funded).
+    if (await tryCircle(address)) {
+      return NextResponse.json({
+        ok: true,
+        source: "circle",
+        message: "Requested from the Circle faucet. Arriving shortly.",
+      });
+    }
+
+    // 2) Fallback: project treasury transfer (Circle rate-limited or down).
     const wallet = getWalletClient();
     const treasury = await publicClient.getBalance({
       address: wallet.account.address,
@@ -29,22 +74,21 @@ export async function POST(req: NextRequest) {
           ok: false,
           fallback: true,
           faucetUrl: "https://faucet.circle.com",
-          message: "Faucet treasury is low. Use the Circle faucet for now.",
+          message:
+            "Circle faucet is rate-limited and the treasury is low. Try the Circle faucet directly.",
         },
         { status: 503 }
       );
     }
-
     const hash = await wallet.sendTransaction({
       to: address as `0x${string}`,
       value: DRIP,
     });
-
     return NextResponse.json({
       ok: true,
+      source: "treasury",
       hash,
-      amount: "2",
-      message: "2 USDC sent. Arriving in a few seconds.",
+      message: "Circle faucet was busy, sent 5 USDC from the project pool.",
     });
   } catch (err) {
     const m = err instanceof Error ? err.message : String(err);
@@ -54,7 +98,7 @@ export async function POST(req: NextRequest) {
         ok: false,
         fallback: true,
         faucetUrl: "https://faucet.circle.com",
-        message: "Faucet failed. Use the Circle faucet.",
+        message: "Faucet failed. Use the Circle faucet directly.",
       },
       { status: 502 }
     );
