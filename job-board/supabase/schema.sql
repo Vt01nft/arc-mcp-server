@@ -65,12 +65,22 @@ alter table jobs enable row level security;
 alter table evaluations enable row level security;
 alter table deliverables enable row level security;
 
+-- Public read only. Writes go through the service role, which bypasses
+-- RLS, so NO public insert/update policies (a permissive insert policy
+-- here would let the public anon key spoof rows - do not add one).
 create policy "Public read jobs" on jobs for select using (true);
-create policy "Service role write jobs" on jobs for insert with check (true);
-create policy "Service role update jobs" on jobs for update using (true);
-
 create policy "Public read evaluations" on evaluations for select using (true);
-create policy "Service role write evaluations" on evaluations for insert with check (true);
-
 create policy "Public read deliverables" on deliverables for select using (true);
-create policy "Service role write deliverables" on deliverables for insert with check (true);
+
+-- Faucet abuse log: 1 drip / address / 24h, 3 / IP / hour. Server-only
+-- (service role bypasses RLS; no public policies = no anon access).
+create table if not exists faucet_log (
+  id         uuid primary key default gen_random_uuid(),
+  address    text not null,
+  ip         text,
+  source     text,
+  created_at timestamptz not null default now()
+);
+create index if not exists faucet_log_address_idx on faucet_log (address, created_at desc);
+create index if not exists faucet_log_ip_idx on faucet_log (ip, created_at desc);
+alter table faucet_log enable row level security;
