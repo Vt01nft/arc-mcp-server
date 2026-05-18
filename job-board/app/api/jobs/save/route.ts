@@ -8,12 +8,22 @@ type SaveJobBody = {
   category: JobCategory;
   clientAddress: string;
   providerAddress: string;
+  clientEmail?: string | null;
+  agent?: string | null;
 };
 
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as SaveJobBody;
-    const { chainJobId, description, category, clientAddress, providerAddress } = body;
+    const {
+      chainJobId,
+      description,
+      category,
+      clientAddress,
+      providerAddress,
+      clientEmail,
+      agent,
+    } = body;
 
     if (!description || !providerAddress) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -26,6 +36,8 @@ export async function POST(req: NextRequest) {
       category: category ?? "General",
       client_address: clientAddress,
       provider_address: providerAddress,
+      client_email: clientEmail ?? null,
+      agent: agent ?? null,
     });
 
     return NextResponse.json({ saved: true, chainJobId });

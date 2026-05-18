@@ -52,7 +52,7 @@ export const JOB_CATEGORIES = [
   "Writing",
   "Data",
   "AI/ML",
-  "Security",
+  "Security Audit",
   "DevOps",
   "Other",
 ] as const;

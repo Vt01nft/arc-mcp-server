@@ -39,6 +39,22 @@ export function getFaucetWalletClient() {
   });
 }
 
+// Wallet client for a specific agent (private key from env AGENT_PK_<ID>).
+export function getSignerFromEnv(pkEnv: string) {
+  const pk = process.env[pkEnv];
+  if (!pk) throw new Error(`${pkEnv} is not set`);
+  const account = privateKeyToAccount(
+    (pk.startsWith("0x") ? pk : `0x${pk}`) as `0x${string}`
+  );
+  return createWalletClient({
+    account,
+    chain: arcTestnet,
+    transport: http(
+      process.env.NEXT_PUBLIC_ARC_RPC ?? "https://rpc.testnet.arc.network"
+    ),
+  });
+}
+
 // USDC on Arc: 6 decimals for ERC-20 transfers, 18 for native gas
 export const formatUsdc = (amount: bigint, decimals = 6) =>
   formatUnits(amount, decimals);

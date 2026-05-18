@@ -61,7 +61,17 @@ export default function PostJobPage() {
     providerAddress: "",
     amountUsdc: "",
     expiryHours: 72,
+    agent: "auto",
   });
+  const [agents, setAgents] = useState<
+    { id: string; name: string; address: string; available: boolean }[]
+  >([]);
+  useEffect(() => {
+    fetch("/api/agents")
+      .then((r) => r.json())
+      .then((d) => setAgents(d.agents ?? []))
+      .catch(() => setAgents([]));
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const savedRef = useRef(false);
@@ -139,8 +149,13 @@ export default function PostJobPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.description || !form.providerAddress) {
-      setError("Description and provider address are required.");
+    const isCustom = form.agent === "custom";
+    if (!form.description || (isCustom && !form.providerAddress)) {
+      setError(
+        isCustom
+          ? "Description and provider address are required."
+          : "Description is required."
+      );
       return;
     }
     setError(null);
@@ -149,18 +164,34 @@ export default function PostJobPage() {
     const expiryTimestamp =
       BigInt(Math.floor(Date.now() / 1000)) + BigInt(form.expiryHours * 3600);
 
-    // Circle wallet path: PIN-sign createJob, resolve the new jobId, and (if
-    // an amount was given and you are also the provider) escrow it in the
-    // same flow: setBudget -> approve -> fund.
     if (circle.status === "ready") {
       setSaving(true);
       try {
+        // Resolve the provider: a chosen agent wallet, Gemini-routed agent,
+        // or a custom address you typed.
+        let providerAddr = form.providerAddress.trim();
+        if (form.agent === "auto") {
+          const r = await fetch("/api/route-agent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              description: form.description,
+              category: form.category,
+            }),
+          }).then((x) => x.json());
+          providerAddr = r.address;
+        } else if (!isCustom) {
+          providerAddr =
+            agents.find((a) => a.id === form.agent)?.address ?? providerAddr;
+        }
+        if (!providerAddr) throw new Error("Could not resolve a provider.");
+
         await circle.execute({
           address: ADDRESSES.ERC8183_JOB,
           abi: ERC8183_ABI,
           functionName: "createJob",
           args: [
-            form.providerAddress as `0x${string}`,
+            providerAddr as `0x${string}`,
             EVALUATOR_ADDRESS,
             expiryTimestamp,
             form.description,
@@ -173,15 +204,16 @@ export default function PostJobPage() {
           form.description
         );
 
+        // Real client-funded ERC-8183 escrow only works when you are the
+        // provider (contract requires provider setBudget + client fund).
         const amount = form.amountUsdc.trim();
-        const wantEscrow =
+        if (
+          isCustom &&
           jobId != null &&
           Number(amount) > 0 &&
-          circle.address?.toLowerCase() ===
-            form.providerAddress.trim().toLowerCase();
-
-        if (wantEscrow) {
-          const raw = parseUnits(amount, 6); // USDC ERC-20 is 6 decimals
+          circle.address?.toLowerCase() === providerAddr.toLowerCase()
+        ) {
+          const raw = parseUnits(amount, 6);
           await circle.execute({
             address: ADDRESSES.ERC8183_JOB,
             abi: ERC8183_ABI,
@@ -210,9 +242,24 @@ export default function PostJobPage() {
             description: form.description,
             category: form.category,
             clientAddress: circle.address,
-            providerAddress: form.providerAddress,
+            providerAddress: providerAddr,
+            clientEmail: circle.email,
+            agent: form.agent,
           }),
         }).catch(() => {});
+
+        // Agent job: kick the autonomous runner (fire and forget).
+        if (!isCustom && jobId != null) {
+          fetch("/api/agent/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jobId,
+              clientEmail: circle.email,
+              amountUsdc: amount,
+            }),
+          }).catch(() => {});
+        }
 
         router.push(jobId != null ? `/jobs/${jobId}` : "/jobs");
       } catch (err) {
@@ -311,24 +358,58 @@ export default function PostJobPage() {
           </div>
 
           <div>
-            <label className="label">Provider Address</label>
-            <input
-              type="text"
-              name="providerAddress"
-              value={form.providerAddress}
+            <label className="label">Agent</label>
+            <select
+              name="agent"
+              value={form.agent}
               onChange={handleChange}
-              placeholder="0x…"
-              className="field mono"
-            />
+              className="field"
+            >
+              <option value="auto">Auto (Gemini picks the best agent)</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id} disabled={!a.available}>
+                  {a.name}
+                  {a.available ? "" : " (unavailable)"}
+                </option>
+              ))}
+              <option value="custom">Custom address (assign it yourself)</option>
+            </select>
             <p
               className="eyebrow"
               style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
             >
-              The wallet that will do this job and receive the USDC when it
-              is approved. This can be a person or an AI agent. Testing it
-              yourself? Paste your own address (shown as “Your address” below).
+              An AI agent does the job autonomously, then Gemini reviews it and
+              the evaluator releases the bounty. "Auto" lets Gemini route to the
+              best-fit agent. Pick "Custom address" to assign a specific wallet
+              (a person, or yourself for testing).
             </p>
           </div>
+
+          {form.agent === "custom" && (
+            <div>
+              <label className="label">Provider Address</label>
+              <input
+                type="text"
+                name="providerAddress"
+                value={form.providerAddress}
+                onChange={handleChange}
+                placeholder="0x…"
+                className="field mono"
+              />
+              <p
+                className="eyebrow"
+                style={{
+                  marginTop: 8,
+                  textTransform: "none",
+                  letterSpacing: 0,
+                }}
+              >
+                The wallet that will do this job and receive the USDC when it
+                is approved. Paste your own address (shown as “Your address”
+                below) to test it yourself.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="label">Escrow amount (USDC)</label>
