@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
         `Score this deliverable for the brief. JSON {"complete":bool,"score":0..1,"issues":"..."}.\nBrief:\n${job.description.slice(
           0,
           2000
-        )}\nDeliverable:\n${deliverable.slice(0, 6000)}`,
+        )}\nDeliverable:\n${deliverable.slice(0, 120000)}`,
         256
       );
       const v = JSON.parse(vr.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as {
@@ -187,8 +187,9 @@ export async function POST(req: NextRequest) {
         `You are the evaluator. Decide if the deliverable satisfies the brief. Strict but fair. JSON {"decision":"approve"|"reject","reasoning":"2-4 sentences","confidence":0..1}.\nBrief:\n${job.description.slice(
           0,
           2500
-        )}\nDeliverable:\n${deliverable.slice(0, 8000)}`,
-        512
+        )}\nDeliverable:\n${deliverable.slice(0, 120000)}`,
+        3072,
+        1024
       );
       const e = JSON.parse(er.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as {
         decision?: string;

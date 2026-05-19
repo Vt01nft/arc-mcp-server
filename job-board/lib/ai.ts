@@ -9,7 +9,7 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 export async function geminiText(
   system: string,
   user: string,
-  maxOutputTokens = 8192
+  maxOutputTokens = 32768
 ): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY not set");
@@ -50,7 +50,7 @@ export async function openrouterText(
   model: string,
   system: string,
   user: string,
-  maxTokens = 8000
+  maxTokens = 32000
 ): Promise<string> {
   const key = process.env.OPENROUTER_KEY;
   if (!key) throw new Error("OPENROUTER_KEY not set");
