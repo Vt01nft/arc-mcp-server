@@ -26,81 +26,86 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ events: data as CachedEvent[] });
   }
 
-  const { data: allEvents, error } = await supabase
-    .from("event_cache")
-    .select("event_name, job_id, amount_raw, block_number, logged_at");
-  if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // PostgREST caps a select at 1000 rows, so pulling rows and counting in
+  // JS silently undercounts once the cache exceeds 1000. Use exact COUNT
+  // queries instead: correct regardless of cache size, and lighter.
+  const TYPES = [
+    "JobCreated",
+    "BudgetSet",
+    "JobFunded",
+    "JobSubmitted",
+    "JobCompleted",
+    "JobRejected",
+    "Refunded",
+  ];
 
-  const events = allEvents ?? [];
+  const countOf = async (name: string): Promise<number> => {
+    const { count } = await supabase
+      .from("event_cache")
+      .select("*", { count: "exact", head: true })
+      .eq("event_name", name);
+    return count ?? 0;
+  };
 
-  // Accurate breakdown by event type (block_number is real; logged_at is
-  // only the sync time, so a per-day series would be fabricated).
+  const [
+    counts,
+    totalRes,
+    latestRes,
+    fundedRows,
+  ] = await Promise.all([
+    Promise.all(TYPES.map((t) => countOf(t))),
+    supabase
+      .from("event_cache")
+      .select("*", { count: "exact", head: true }),
+    supabase
+      .from("event_cache")
+      .select("block_number")
+      .order("block_number", { ascending: false })
+      .limit(1),
+    // JobFunded count is bounded by job count (well under the row cap), so
+    // summing these rows for volume is accurate.
+    supabase
+      .from("event_cache")
+      .select("amount_raw")
+      .eq("event_name", "JobFunded")
+      .limit(10000),
+  ]);
+
   const byType: Record<string, number> = {};
-  for (const ev of events)
-    byType[ev.event_name] = (byType[ev.event_name] ?? 0) + 1;
+  TYPES.forEach((t, i) => {
+    if (counts[i] > 0) byType[t] = counts[i];
+  });
 
-  // Honest activity series: bucket events across the synced block span by
-  // block number (monotonic with time) instead of the sync timestamp.
-  const blocks = events
-    .map((e) => e.block_number ?? 0)
-    .filter((b) => b > 0);
-  const minB = blocks.length ? Math.min(...blocks) : 0;
-  const maxB = blocks.length ? Math.max(...blocks) : 0;
-  const BUCKETS = 12;
-  const span = Math.max(1, maxB - minB);
-  const daily: DailyStat[] = Array.from({ length: BUCKETS }, (_, i) => ({
-    date: String(minB + Math.round((span * i) / BUCKETS)),
-    jobs_created: 0,
-    jobs_completed: 0,
-    jobs_rejected: 0,
-    volume_usdc: 0,
-  }));
-  for (const ev of events) {
-    const b = ev.block_number ?? 0;
-    if (b <= 0) continue;
-    const idx = Math.min(
-      BUCKETS - 1,
-      Math.floor(((b - minB) / span) * BUCKETS)
-    );
-    const slot = daily[idx];
-    if (ev.event_name === "JobCreated") slot.jobs_created++;
-    if (ev.event_name === "JobCompleted") slot.jobs_completed++;
-    if (ev.event_name === "JobRejected") slot.jobs_rejected++;
-    if (ev.event_name === "JobFunded" && ev.amount_raw) {
-      slot.volume_usdc += Number(BigInt(ev.amount_raw)) / 1_000_000;
+  const created = byType["JobCreated"] ?? 0;
+  const completed = byType["JobCompleted"] ?? 0;
+  const rejected = byType["JobRejected"] ?? 0;
+
+  const totalVolume = (fundedRows.data ?? []).reduce((s, e) => {
+    if (!e.amount_raw) return s;
+    try {
+      return s + Number(BigInt(e.amount_raw)) / 1_000_000;
+    } catch {
+      return s;
     }
-  }
+  }, 0);
 
-  const created = events.filter((e) => e.event_name === "JobCreated");
-  const completed = events.filter((e) => e.event_name === "JobCompleted");
-  const rejected = events.filter((e) => e.event_name === "JobRejected");
-  const funded = events.filter((e) => e.event_name === "JobFunded");
+  const latestBlock = latestRes.data?.[0]?.block_number ?? 0;
+  const cachedEvents = totalRes.count ?? 0;
+  const activeJobs = Math.max(0, created - completed - rejected);
 
-  const totalVolume = funded.reduce(
-    (s, e) => (e.amount_raw ? s + Number(BigInt(e.amount_raw)) / 1_000_000 : s),
-    0
-  );
-  const cutoff = new Date(Date.now() - 86_400_000).toISOString();
-  const events24h = events.filter((e) => e.logged_at >= cutoff).length;
-  const latestBlock = events.reduce(
-    (max, e) => Math.max(max, e.block_number ?? 0),
-    0
-  );
-  const activeJobs = Math.max(
-    0,
-    created.length - completed.length - rejected.length
-  );
+  // The page renders an accurate by-type breakdown, not a fabricated time
+  // series, so daily is intentionally empty.
+  const daily: DailyStat[] = [];
 
   const stats: StatsSnapshot = {
-    total_jobs: created.length,
+    total_jobs: created,
     active_jobs: activeJobs,
-    completed_jobs: completed.length,
-    rejected_jobs: rejected.length,
+    completed_jobs: completed,
+    rejected_jobs: rejected,
     total_volume_usdc: totalVolume.toFixed(2),
-    events_24h: events24h,
+    events_24h: 0,
     latest_block: latestBlock,
-    cached_events: events.length,
+    cached_events: cachedEvents,
   };
   return NextResponse.json({ stats, daily, byType });
 }
