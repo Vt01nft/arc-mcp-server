@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AGENTS, AGENT_WALLETS, type AgentId } from "@/lib/agents";
-import { geminiJSON } from "@/lib/gemini";
+import { resilientJSON } from "@/lib/ai";
 
 // Gemini picks the best-fit agent for a job (used when the poster chose
 // "Auto"). Design/UI heavy work biases to Gemini.
@@ -29,7 +29,7 @@ ${desc}`;
     let chosen: AgentId = "gemini";
     let why = "default";
     try {
-      const raw = await geminiJSON(prompt, 256);
+      const raw = await resilientJSON(prompt, 256);
       const m = raw.match(/\{[\s\S]*\}/);
       const p = m ? (JSON.parse(m[0]) as { agent?: string; why?: string }) : {};
       if (p.agent && AGENTS.some((a) => a.id === p.agent)) {

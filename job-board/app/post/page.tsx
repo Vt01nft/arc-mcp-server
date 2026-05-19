@@ -175,97 +175,66 @@ export default function PostJobPage() {
     if (circle.status === "ready") {
       setSaving(true);
       try {
-        // Resolve the provider: a chosen agent wallet, Gemini-routed agent,
-        // or a custom address you typed.
+        // Resolve the provider: a chosen agent wallet, the Gemini-routed
+        // agent, or a custom address you typed.
         let providerAddr = form.providerAddress.trim();
         if (form.agent === "auto") {
-          const r = await fetch("/api/route-agent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              description: form.description,
-              category: form.category,
-            }),
-          }).then((x) => x.json());
-          providerAddr = r.address;
+          let routed: { address?: string } = {};
+          try {
+            routed = await fetch("/api/route-agent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                description: form.description,
+                category: form.category,
+              }),
+            }).then((x) => x.json());
+          } catch {
+            throw new Error(
+              "Could not reach the agent router. Check your connection and try again."
+            );
+          }
+          providerAddr = routed.address ?? "";
         } else if (!isCustom) {
           providerAddr =
             agents.find((a) => a.id === form.agent)?.address ?? providerAddr;
         }
-        if (!providerAddr) throw new Error("Could not resolve a provider.");
+        if (!providerAddr)
+          throw new Error("Could not resolve a provider for this job.");
 
-        await circle.execute({
-          address: ADDRESSES.ERC8183_JOB,
-          abi: ERC8183_ABI,
-          functionName: "createJob",
-          args: [
-            providerAddr as `0x${string}`,
-            EVALUATOR_ADDRESS,
-            expiryTimestamp,
-            form.description,
-            zeroAddress,
-          ],
-        });
+        const amount = form.amountUsdc.trim();
+        const isSelf =
+          circle.address?.toLowerCase() === providerAddr.toLowerCase();
+
+        // 1) Create the job (one signature). Isolated so a Circle signing
+        // failure is reported precisely and nothing downstream runs.
+        try {
+          await circle.execute({
+            address: ADDRESSES.ERC8183_JOB,
+            abi: ERC8183_ABI,
+            functionName: "createJob",
+            args: [
+              providerAddr as `0x${string}`,
+              EVALUATOR_ADDRESS,
+              expiryTimestamp,
+              form.description,
+              zeroAddress,
+            ],
+          });
+        } catch (e) {
+          const m = (e as Error).message || "the signature did not complete";
+          throw new Error(
+            `Creating the job did not complete (${m}). Nothing was charged. Please try again.`
+          );
+        }
 
         const jobId = await resolveJobId(
           circle.address as string,
           form.description
         );
 
-        // Real client-funded ERC-8183 escrow. The provider must quote the
-        // price (setBudget) before the client can fund. For an agent job the
-        // agent wallet is server-controlled, so the server quotes it; you
-        // then approve + fund from your own wallet, which debits your USDC
-        // into the contract. complete() later releases it to the agent
-        // automatically; a reject refunds you.
-        const amount = form.amountUsdc.trim();
-        const isSelf =
-          circle.address?.toLowerCase() === providerAddr.toLowerCase();
-        const wantEscrow = jobId != null && Number(amount) > 0;
-        if (wantEscrow) {
-          const raw = parseUnits(amount, 6);
-          let budgetSet = false;
-
-          if (!isCustom) {
-            // Agent job: server signs setBudget with the agent's wallet.
-            const sb = await fetch("/api/agent/set-budget", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ jobId, amountUsdc: amount }),
-            }).then((x) => x.json());
-            if (!sb.ok) {
-              throw new Error(sb.error || "Could not set the escrow budget.");
-            }
-            budgetSet = true;
-          } else if (isSelf) {
-            // Self-assigned (testing): you are the provider, you quote it.
-            await circle.execute({
-              address: ADDRESSES.ERC8183_JOB,
-              abi: ERC8183_ABI,
-              functionName: "setBudget",
-              args: [BigInt(jobId!), raw, "0x"],
-            });
-            budgetSet = true;
-          }
-          // Custom address that is not you: that provider sets the budget
-          // and you fund from the job page (cannot sign for their wallet).
-
-          if (budgetSet) {
-            await circle.execute({
-              address: ADDRESSES.USDC,
-              abi: USDC_ABI,
-              functionName: "approve",
-              args: [ADDRESSES.ERC8183_JOB, raw],
-            });
-            await circle.execute({
-              address: ADDRESSES.ERC8183_JOB,
-              abi: ERC8183_ABI,
-              functionName: "fund",
-              args: [BigInt(jobId!), "0x"],
-            });
-          }
-        }
-
+        // 2) Record the job immediately so a later escrow hiccup can never
+        // lose it (you can always fund it from the job page).
         await fetch("/api/jobs/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -280,7 +249,76 @@ export default function PostJobPage() {
           }),
         }).catch(() => {});
 
-        // Agent job: kick the autonomous runner (fire and forget).
+        // 3) Optional escrow. Non-fatal: if a step fails the job still
+        // exists Open and can be funded from its page, so a hiccup here
+        // never strands you on a blank error.
+        if (jobId != null && Number(amount) > 0) {
+          try {
+            const raw = parseUnits(amount, 6);
+            let budgetSet = false;
+            if (!isCustom) {
+              // Agent job: server signs setBudget with the agent's wallet.
+              const sb = await fetch("/api/agent/set-budget", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jobId, amountUsdc: amount }),
+              })
+                .then((x) => x.json())
+                .catch(() => ({ ok: false, error: "network" }));
+              if (!sb.ok)
+                throw new Error(sb.error || "could not set the budget");
+              budgetSet = true;
+            } else if (isSelf) {
+              await circle.execute({
+                address: ADDRESSES.ERC8183_JOB,
+                abi: ERC8183_ABI,
+                functionName: "setBudget",
+                args: [BigInt(jobId), raw, "0x"],
+              });
+              budgetSet = true;
+            }
+            if (budgetSet) {
+              // Skip the USDC approval when the contract already has enough
+              // allowance - one less signature on repeat posts.
+              let allowance = 0n;
+              try {
+                allowance = (await publicClient.readContract({
+                  address: ADDRESSES.USDC,
+                  abi: USDC_ABI,
+                  functionName: "allowance",
+                  args: [
+                    circle.address as `0x${string}`,
+                    ADDRESSES.ERC8183_JOB,
+                  ],
+                })) as bigint;
+              } catch {
+                /* treat as zero allowance */
+              }
+              if (allowance < raw) {
+                await circle.execute({
+                  address: ADDRESSES.USDC,
+                  abi: USDC_ABI,
+                  functionName: "approve",
+                  args: [ADDRESSES.ERC8183_JOB, raw],
+                });
+              }
+              await circle.execute({
+                address: ADDRESSES.ERC8183_JOB,
+                abi: ERC8183_ABI,
+                functionName: "fund",
+                args: [BigInt(jobId), "0x"],
+              });
+            }
+          } catch (e) {
+            setError(
+              `Job #${jobId} was created but the escrow was not funded (${
+                (e as Error).message
+              }). Open the job to fund it from there.`
+            );
+          }
+        }
+
+        // 4) Kick the autonomous runner for agent jobs (fire and forget).
         if (!isCustom && jobId != null) {
           fetch("/api/agent/run", {
             method: "POST",
@@ -459,12 +497,15 @@ export default function PostJobPage() {
               className="eyebrow"
               style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
             >
-              For an agent job, this USDC is debited from your wallet into the
-              ERC-8183 escrow now: you sign create, then approve, then fund
-              (three PIN prompts). It is released to the agent automatically
-              when the work is approved, and refunded to you if it is rejected.
-              Leave it blank to post without escrow (the agent still does the
-              work; no payout).
+              This USDC is debited from your wallet into the ERC-8183 escrow.
+              You confirm two transactions with your PIN: create the job, then
+              fund it. The very first time you fund, a one-time USDC approval
+              adds a third; later posts reuse it and only ask for two. It
+              cannot be a single prompt because the standard requires funding
+              to be its own on-chain step. The escrow is released to the agent
+              automatically when the work is approved, and refunded to you if
+              it is rejected. Leave it blank to post without escrow (the agent
+              still does the work; no payout).
             </p>
           </div>
 

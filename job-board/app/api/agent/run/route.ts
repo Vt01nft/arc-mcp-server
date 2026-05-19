@@ -17,8 +17,7 @@ import {
   BUILD_SKILL,
   SECURITY_AUDIT_SKILL,
 } from "@/lib/agents";
-import { callAgent } from "@/lib/ai";
-import { geminiJSON } from "@/lib/gemini";
+import { callAgent, resilientJSON } from "@/lib/ai";
 
 export const maxDuration = 300;
 
@@ -125,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     // 2) Self-verify, one redo if weak.
     try {
-      const vr = await geminiJSON(
+      const vr = await resilientJSON(
         `Score this deliverable for the brief. JSON {"complete":bool,"score":0..1,"issues":"..."}.\nBrief:\n${job.description.slice(
           0,
           2000
@@ -191,7 +190,7 @@ export async function POST(req: NextRequest) {
     let evaluated = false;
     let reasoningText = "Evaluator could not assess the deliverable.";
     try {
-      const er = await geminiJSON(
+      const er = await resilientJSON(
         `You are the evaluator. Decide if the deliverable satisfies the brief. Strict but fair. JSON {"decision":"approve"|"reject","reasoning":"2-4 sentences","confidence":0..1}.\nBrief:\n${job.description.slice(
           0,
           2500

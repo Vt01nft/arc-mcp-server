@@ -3,7 +3,8 @@ import { getServiceClient } from "@/lib/supabase";
 import { publicClient } from "@/lib/viem";
 import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI } from "@/contracts/abis";
-import { geminiJSON, GEMINI_MODEL } from "@/lib/gemini";
+import { GEMINI_MODEL } from "@/lib/gemini";
+import { resilientJSON } from "@/lib/ai";
 import type { EvaluateRequest, EvaluateResponse } from "@/lib/types";
 
 // Bound prompt size so a caller can't drive unbounded token spend.
@@ -78,7 +79,7 @@ Respond with ONLY a JSON object in exactly this format:
 
     // Evaluator decides whether USDC is released, so let the model reason
     // (thinking budget) and give it room for both the reasoning + JSON answer.
-    const text = await geminiJSON(prompt, 3072, 1024);
+    const text = await resilientJSON(prompt, 3072, 1024);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("model did not return valid JSON");
 
