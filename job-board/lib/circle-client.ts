@@ -12,6 +12,13 @@ export function getSdk(appId: string): W3SSdk {
   return sdk;
 }
 
+// Drop the cached SDK so the next call builds a clean instance. A long-lived
+// page can leave the singleton with a dead connection that surfaces as a
+// Circle "Network error"; recreating it clears that.
+export function resetSdk() {
+  sdk = null;
+}
+
 export function setCircleAuth(
   appId: string,
   userToken: string,
@@ -30,8 +37,17 @@ export function executeChallenge(
   return new Promise((resolve, reject) => {
     s.execute(challengeId, (error) => {
       if (error) {
+        // Surface Circle's real error code so an opaque "Network error"
+        // is at least diagnosable.
+        const code = (error as { code?: string | number }).code;
+        // eslint-disable-next-line no-console
+        console.error("Circle challenge error:", error);
         reject(
-          new Error(error.message ?? "Circle challenge was cancelled or failed")
+          new Error(
+            `${error.message ?? "Circle challenge failed"}${
+              code != null ? ` [code ${code}]` : ""
+            }`
+          )
         );
       } else {
         resolve();

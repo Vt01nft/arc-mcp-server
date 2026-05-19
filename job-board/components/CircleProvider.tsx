@@ -13,6 +13,7 @@ import {
   executeChallenge,
   abiFunctionSignature,
   serializeAbiParams,
+  resetSdk,
 } from "@/lib/circle-client";
 import { formatUnits } from "viem";
 import { publicClient } from "@/lib/viem";
@@ -178,22 +179,53 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
 
   const execute = useCallback<CircleCtx["execute"]>(
     async ({ address: contractAddress, abi, functionName, args }) => {
-      if (!session) throw new Error("Sign in with Circle first");
+      if (!session && !email) throw new Error("Sign in with Circle first");
+
+      let appId = session?.appId ?? "";
+      let userToken = session?.userToken ?? "";
+      let walletId = session?.walletId ?? "";
+
+      // Refresh the Circle session right before signing. User tokens expire
+      // (~60 min) and a stale token or a dead SDK socket on a long-lived
+      // page surfaces as an opaque "Network error" from the PIN widget.
+      // Re-minting the token is PIN-free for an existing wallet.
+      if (email) {
+        try {
+          const s = await fetch("/api/circle/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: email }),
+          }).then((r) => r.json());
+          if (!s.error && s.userToken) {
+            appId = s.appId;
+            userToken = s.userToken;
+            walletId = (s.wallets ?? [])[0]?.id ?? walletId;
+            resetSdk();
+            setCircleAuth(appId, s.userToken, s.encryptionKey);
+            setSession({ appId, userToken, walletId });
+          }
+        } catch {
+          /* fall back to the existing session token */
+        }
+      }
+      if (!appId || !userToken || !walletId)
+        throw new Error("Sign in with Circle first");
+
       const res = await fetch("/api/circle/contract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userToken: session.userToken,
-          walletId: session.walletId,
+          userToken,
+          walletId,
           contractAddress,
           abiFunctionSignature: abiFunctionSignature(abi, functionName),
           abiParameters: serializeAbiParams(args),
         }),
       }).then((r) => r.json());
       if (res.error) throw new Error(res.error);
-      await executeChallenge(session.appId, res.challengeId); // Circle PIN UI
+      await executeChallenge(appId, res.challengeId); // Circle PIN UI
     },
-    [session]
+    [session, email]
   );
 
   const value = useMemo<CircleCtx>(
