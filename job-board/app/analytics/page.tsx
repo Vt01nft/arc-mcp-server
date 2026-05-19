@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(124px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
           gap: 12,
           marginBottom: 20,
         }}
@@ -202,7 +202,11 @@ export default function AnalyticsPage() {
             }))
           : tiles.map((t, i) => ({ ...t, k: i }))
         ).map((t) => (
-          <div key={t.k} className="paper-card" style={{ padding: "16px 18px" }}>
+          <div
+            key={t.k}
+            className="paper-card"
+            style={{ padding: "16px 18px", minWidth: 0 }}
+          >
             <div
               className="eyebrow"
               style={{ fontSize: 10, marginBottom: 10, letterSpacing: 0.5 }}
@@ -211,7 +215,17 @@ export default function AnalyticsPage() {
             </div>
             <div
               className="mono"
-              style={{ fontSize: 25, color: "var(--ink)", fontWeight: 600 }}
+              style={{
+                fontSize: 20,
+                color: "var(--ink)",
+                fontWeight: 600,
+                letterSpacing: -0.3,
+                lineHeight: 1.15,
+                fontVariantNumeric: "tabular-nums",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "clip",
+              }}
             >
               {t.value}
             </div>
