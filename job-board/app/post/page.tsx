@@ -10,22 +10,27 @@ import { publicClient } from "@/lib/viem";
 import { JOB_CATEGORIES, type JobCategory } from "@/lib/types";
 import { useCircle } from "@/components/CircleProvider";
 
-// After a Circle createJob (no receipt), find the new jobId by scanning back
-// from jobCounter for the job whose client + description match ours.
+// Circle's contractExecution gives no tx receipt, so after createJob we find
+// the new jobId by watching jobCounter climb past the snapshot we took just
+// before signing, then matching only the freshly created id(s). Polling fast
+// against a tiny range (usually one id) instead of a slow 30-deep scan keeps
+// the gap before the next PIN short.
 async function resolveJobId(
   client: string,
-  description: string
+  description: string,
+  sinceCounter: bigint
 ): Promise<number | null> {
-  for (let attempt = 0; attempt < 8; attempt++) {
+  const since = Number(sinceCounter);
+  for (let attempt = 0; attempt < 25; attempt++) {
     try {
-      const counter = (await publicClient.readContract({
-        address: ADDRESSES.ERC8183_JOB,
-        abi: ERC8183_ABI,
-        functionName: "jobCounter",
-      })) as bigint;
-      for (let i = 0; i < 30; i++) {
-        const id = Number(counter) - i;
-        if (id <= 0) break;
+      const counter = Number(
+        (await publicClient.readContract({
+          address: ADDRESSES.ERC8183_JOB,
+          abi: ERC8183_ABI,
+          functionName: "jobCounter",
+        })) as bigint
+      );
+      for (let id = counter; id > since; id--) {
         const j = (await publicClient.readContract({
           address: ADDRESSES.ERC8183_JOB,
           abi: ERC8183_ABI,
@@ -40,9 +45,9 @@ async function resolveJobId(
         }
       }
     } catch {
-      /* retry */
+      /* transient RPC; retry */
     }
-    await new Promise((r) => setTimeout(r, 2500)); // wait for the tx to mine
+    await new Promise((r) => setTimeout(r, 700)); // Arc blocks are ~1-2s
   }
   return null;
 }
@@ -206,6 +211,19 @@ export default function PostJobPage() {
         const isSelf =
           circle.address?.toLowerCase() === providerAddr.toLowerCase();
 
+        // Snapshot the job counter so we can resolve the new id fast
+        // (watch it climb past this) instead of a slow deep scan.
+        let sinceCounter = 0n;
+        try {
+          sinceCounter = (await publicClient.readContract({
+            address: ADDRESSES.ERC8183_JOB,
+            abi: ERC8183_ABI,
+            functionName: "jobCounter",
+          })) as bigint;
+        } catch {
+          /* default 0: still correct, just scans wider */
+        }
+
         // 1) Create the job (one signature). Isolated so a Circle signing
         // failure is reported precisely and nothing downstream runs.
         try {
@@ -230,7 +248,8 @@ export default function PostJobPage() {
 
         const jobId = await resolveJobId(
           circle.address as string,
-          form.description
+          form.description,
+          sinceCounter
         );
 
         // 2) Record the job immediately so a later escrow hiccup can never

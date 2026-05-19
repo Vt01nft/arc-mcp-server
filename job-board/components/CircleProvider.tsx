@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -58,6 +59,11 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
     userToken: string;
     walletId: string;
   } | null>(null);
+  // When the Circle token was last re-minted. We only refresh it if it is
+  // older than the TTL, so three signatures in one post flow do not each
+  // pay for a session round trip + SDK rebuild.
+  const lastRefreshRef = useRef(0);
+  const TOKEN_TTL_MS = 5 * 60 * 1000;
 
   async function fetchBal(addr: string) {
     try {
@@ -115,6 +121,7 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
       const w = (s.wallets ?? [])[0];
       if (!w) throw new Error("Circle wallet not ready, try again");
       setSession({ appId, userToken: s.userToken, walletId: w.id });
+      lastRefreshRef.current = Date.now();
       setAddress(w.address);
       setEmail(id);
       setStatus("ready");
@@ -185,11 +192,14 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
       let userToken = session?.userToken ?? "";
       let walletId = session?.walletId ?? "";
 
-      // Refresh the Circle session right before signing. User tokens expire
-      // (~60 min) and a stale token or a dead SDK socket on a long-lived
-      // page surfaces as an opaque "Network error" from the PIN widget.
-      // Re-minting the token is PIN-free for an existing wallet.
-      if (email) {
+      // Refresh the Circle session only when it is stale (or missing). User
+      // tokens expire (~60 min) and a dead SDK socket on a long-lived page
+      // surfaces as an opaque "Network error". Throttling to the TTL means
+      // three signatures in one post reuse one fresh token instead of doing
+      // a session round trip + SDK rebuild before every PIN.
+      const stale =
+        !session || Date.now() - lastRefreshRef.current > TOKEN_TTL_MS;
+      if (email && stale) {
         try {
           const s = await fetch("/api/circle/session", {
             method: "POST",
@@ -203,6 +213,7 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
             resetSdk();
             setCircleAuth(appId, s.userToken, s.encryptionKey);
             setSession({ appId, userToken, walletId });
+            lastRefreshRef.current = Date.now();
           }
         } catch {
           /* fall back to the existing session token */
