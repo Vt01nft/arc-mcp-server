@@ -297,8 +297,12 @@ export default function PostJobPage() {
               budgetSet = true;
             }
             if (budgetSet) {
-              // Skip the USDC approval when the contract already has enough
-              // allowance - one less signature on repeat posts.
+              // fund() consumes the allowance each time, so approving the
+              // exact amount would re-prompt every job. Instead approve a
+              // generous STANDING allowance once; afterwards allowance stays
+              // above a single budget and approve is skipped, making every
+              // later post just two prompts (create, fund).
+              const STANDING_ALLOWANCE = parseUnits("1000000", 6); // 1M USDC
               let allowance = 0n;
               try {
                 allowance = (await publicClient.readContract({
@@ -318,7 +322,7 @@ export default function PostJobPage() {
                   address: ADDRESSES.USDC,
                   abi: USDC_ABI,
                   functionName: "approve",
-                  args: [ADDRESSES.ERC8183_JOB, raw],
+                  args: [ADDRESSES.ERC8183_JOB, STANDING_ALLOWANCE],
                 });
               }
               await circle.execute({
