@@ -3,12 +3,23 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
   StatsSnapshot,
-  DailyStat,
   CachedEvent,
   NarrationResponse,
+  ByType,
 } from "@/lib/analytics-types";
 
 const EXPLORER = "https://testnet.arcscan.app";
+const JOB_CONTRACT = "0x0747EEf0706327138c69792bF28Cd525089e4583";
+
+const TYPE_ORDER = [
+  "JobCreated",
+  "BudgetSet",
+  "JobFunded",
+  "JobSubmitted",
+  "JobCompleted",
+  "JobRejected",
+  "Refunded",
+];
 
 function short(h: string) {
   return h ? `${h.slice(0, 8)}...${h.slice(-6)}` : "";
@@ -16,7 +27,7 @@ function short(h: string) {
 
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<StatsSnapshot | null>(null);
-  const [daily, setDaily] = useState<DailyStat[]>([]);
+  const [byType, setByType] = useState<ByType>({});
   const [events, setEvents] = useState<CachedEvent[]>([]);
   const [narration, setNarration] = useState<NarrationResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,14 +39,14 @@ export default function AnalyticsPage() {
     try {
       const [s, f] = await Promise.all([
         fetch("/api/analytics/events?type=stats").then((r) => r.json()),
-        fetch("/api/analytics/events?type=feed&limit=20").then((r) => r.json()),
+        fetch("/api/analytics/events?type=feed&limit=24").then((r) => r.json()),
       ]);
       setStats(s.stats ?? null);
-      setDaily(s.daily ?? []);
+      setByType(s.byType ?? {});
       setEvents(f.events ?? []);
       setUpdated(new Date().toLocaleTimeString());
     } catch {
-      /* silent retry on next tick */
+      /* silent, retried on the interval */
     } finally {
       setLoading(false);
     }
@@ -54,7 +65,7 @@ export default function AnalyticsPage() {
       const r = await fetch("/api/analytics/narrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stats, daily }),
+        body: JSON.stringify({ stats, daily: [] }),
       });
       const d = await r.json();
       if (!d.error) setNarration(d as NarrationResponse);
@@ -75,28 +86,32 @@ export default function AnalyticsPage() {
     setSyncing(false);
   }
 
-  const tiles: { label: string; value: string }[] = stats
+  const tiles = stats
     ? [
-        { label: "Total Jobs", value: String(stats.total_jobs) },
+        { label: "Jobs Created", value: String(stats.total_jobs) },
         { label: "Active", value: String(stats.active_jobs) },
         { label: "Completed", value: String(stats.completed_jobs) },
         { label: "Rejected", value: String(stats.rejected_jobs) },
         { label: "Volume USDC", value: stats.total_volume_usdc },
-        { label: "Events 24h", value: String(stats.events_24h) },
+        { label: "Cached Events", value: String(stats.cached_events ?? 0) },
         { label: "Latest Block", value: String(stats.latest_block) },
       ]
     : [];
 
-  const maxBar =
-    daily.reduce(
-      (m, d) =>
-        Math.max(m, d.jobs_created, d.jobs_completed, d.jobs_rejected),
-      0
-    ) || 1;
-  const last14 = daily.slice(-14);
+  const typeRows = TYPE_ORDER.filter((t) => (byType[t] ?? 0) > 0).map((t) => ({
+    name: t,
+    count: byType[t] ?? 0,
+  }));
+  const maxType = typeRows.reduce((m, r) => Math.max(m, r.count), 1);
+  const accentFor = (name: string) =>
+    name === "JobCompleted"
+      ? "var(--accent)"
+      : name === "JobRejected" || name === "Refunded"
+      ? "var(--ink-3)"
+      : "var(--ink)";
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "48px 0 0" }}>
+    <div style={{ maxWidth: 980, margin: "0 auto", padding: "48px 20px 0" }}>
       <div className="kicker">
         <span className="square" />
         Live Testnet Dashboard
@@ -108,13 +123,14 @@ export default function AnalyticsPage() {
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: 16,
+          marginBottom: 28,
         }}
       >
         <div>
-          <h1 className="serif-h" style={{ fontSize: 48, margin: "0 0 10px" }}>
+          <h1 className="serif-h" style={{ fontSize: 46, margin: "0 0 8px" }}>
             Arc Analytics
           </h1>
-          <p className="lede" style={{ fontSize: 16, margin: 0 }}>
+          <p className="lede" style={{ fontSize: 15, margin: 0 }}>
             Every ERC-8183 job on Arc Testnet, chain 5042002.
             {updated ? ` Updated ${updated}.` : ""}
           </p>
@@ -142,7 +158,7 @@ export default function AnalyticsPage() {
       {narration && (
         <div
           className="paper-card-soft"
-          style={{ marginTop: 24, borderLeft: "3px solid var(--accent)" }}
+          style={{ marginBottom: 24, borderLeft: "3px solid var(--accent)" }}
         >
           <div className="eyebrow accent" style={{ marginBottom: 8 }}>
             {narration.trend === "up"
@@ -153,7 +169,7 @@ export default function AnalyticsPage() {
           </div>
           <h2
             className="serif-h"
-            style={{ fontSize: 24, margin: "0 0 8px", lineHeight: 1.3 }}
+            style={{ fontSize: 22, margin: "0 0 8px", lineHeight: 1.3 }}
           >
             {narration.headline}
           </h2>
@@ -161,7 +177,7 @@ export default function AnalyticsPage() {
             style={{
               margin: 0,
               fontSize: 15,
-              lineHeight: 1.6,
+              lineHeight: 1.65,
               color: "var(--ink-2)",
             }}
           >
@@ -173,9 +189,9 @@ export default function AnalyticsPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(124px, 1fr))",
           gap: 12,
-          marginTop: 24,
+          marginBottom: 20,
         }}
       >
         {(loading && tiles.length === 0
@@ -186,16 +202,16 @@ export default function AnalyticsPage() {
             }))
           : tiles.map((t, i) => ({ ...t, k: i }))
         ).map((t) => (
-          <div key={t.k} className="paper-card" style={{ padding: 16 }}>
+          <div key={t.k} className="paper-card" style={{ padding: "16px 18px" }}>
             <div
               className="eyebrow"
-              style={{ fontSize: 10, marginBottom: 8 }}
+              style={{ fontSize: 10, marginBottom: 10, letterSpacing: 0.5 }}
             >
               {t.label || " "}
             </div>
             <div
               className="mono"
-              style={{ fontSize: 24, color: "var(--ink)", fontWeight: 600 }}
+              style={{ fontSize: 25, color: "var(--ink)", fontWeight: 600 }}
             >
               {t.value}
             </div>
@@ -206,110 +222,76 @@ export default function AnalyticsPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: 20,
-          marginTop: 20,
         }}
       >
         <div className="paper-card">
-          <div className="eyebrow accent" style={{ marginBottom: 16 }}>
-            Daily Activity (last 14 days)
+          <div className="eyebrow accent" style={{ marginBottom: 18 }}>
+            On-chain Events by Type
           </div>
-          {last14.length === 0 ? (
-            <p style={{ fontSize: 14, color: "var(--ink-3)" }}>
+          {typeRows.length === 0 ? (
+            <p style={{ fontSize: 14, color: "var(--ink-3)", margin: 0 }}>
               No synced events yet. Press Sync Chain.
             </p>
           ) : (
             <div
-              style={{
-                display: "flex",
-                alignItems: "flex-end",
-                gap: 8,
-                height: 200,
-              }}
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
             >
-              {last14.map((d) => (
-                <div
-                  key={d.date}
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                  title={`${d.date}  created ${d.jobs_created}, completed ${d.jobs_completed}, rejected ${d.jobs_rejected}`}
-                >
+              {typeRows.map((r) => (
+                <div key={r.name}>
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "flex-end",
-                      gap: 2,
-                      height: 170,
+                      justifyContent: "space-between",
+                      fontSize: 12,
+                      marginBottom: 5,
                     }}
                   >
-                    {[
-                      { v: d.jobs_created, c: "var(--ink)" },
-                      { v: d.jobs_completed, c: "var(--accent)" },
-                      { v: d.jobs_rejected, c: "var(--ink-3)" },
-                    ].map((b, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          width: 7,
-                          height: `${(b.v / maxBar) * 170}px`,
-                          minHeight: b.v > 0 ? 3 : 0,
-                          background: b.c,
-                        }}
-                      />
-                    ))}
+                    <span style={{ color: "var(--ink-2)" }}>{r.name}</span>
+                    <span
+                      className="mono"
+                      style={{ color: "var(--ink)", fontWeight: 600 }}
+                    >
+                      {r.count}
+                    </span>
                   </div>
-                  <span
-                    className="mono"
-                    style={{ fontSize: 9, color: "var(--ink-3)" }}
+                  <div
+                    style={{
+                      height: 8,
+                      background: "var(--rule)",
+                      borderRadius: 0,
+                    }}
                   >
-                    {d.date.slice(5)}
-                  </span>
+                    <div
+                      style={{
+                        height: 8,
+                        width: `${Math.max(2, (r.count / maxType) * 100)}%`,
+                        background: accentFor(r.name),
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
           )}
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              marginTop: 14,
-              fontSize: 11,
-            }}
-            className="mono"
-          >
-            <span>
-              <b style={{ color: "var(--ink)" }}>&#9632;</b> created
-            </span>
-            <span>
-              <b style={{ color: "var(--accent)" }}>&#9632;</b> completed
-            </span>
-            <span>
-              <b style={{ color: "var(--ink-3)" }}>&#9632;</b> rejected
-            </span>
-          </div>
         </div>
 
         <div className="paper-card">
-          <div className="eyebrow accent" style={{ marginBottom: 16 }}>
+          <div className="eyebrow accent" style={{ marginBottom: 18 }}>
             Recent Events
           </div>
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              maxHeight: 360,
+              maxHeight: 340,
               overflowY: "auto",
             }}
           >
             {events.length === 0 ? (
-              <p style={{ fontSize: 14, color: "var(--ink-3)" }}>
-                Nothing yet.
+              <p style={{ fontSize: 14, color: "var(--ink-3)", margin: 0 }}>
+                Nothing cached yet.
               </p>
             ) : (
               events.map((e) => (
@@ -320,9 +302,10 @@ export default function AnalyticsPage() {
                   rel="noopener noreferrer"
                   style={{
                     display: "flex",
+                    alignItems: "baseline",
                     justifyContent: "space-between",
-                    gap: 10,
-                    padding: "9px 0",
+                    gap: 12,
+                    padding: "10px 0",
                     borderBottom: "1px solid var(--rule)",
                     textDecoration: "none",
                     color: "var(--ink)",
@@ -330,13 +313,24 @@ export default function AnalyticsPage() {
                 >
                   <span style={{ fontSize: 13 }}>
                     {e.event_name}
-                    {e.job_id != null ? ` #${e.job_id}` : ""}
+                    {e.job_id != null ? (
+                      <span style={{ color: "var(--ink-3)" }}>
+                        {" "}
+                        #{e.job_id}
+                      </span>
+                    ) : (
+                      ""
+                    )}
                   </span>
                   <span
                     className="mono"
-                    style={{ fontSize: 11, color: "var(--ink-3)" }}
+                    style={{
+                      fontSize: 11,
+                      color: "var(--ink-3)",
+                      whiteSpace: "nowrap",
+                    }}
                   >
-                    {short(e.tx_hash)}
+                    blk {e.block_number} · {short(e.tx_hash)}
                   </span>
                 </a>
               ))
@@ -346,14 +340,14 @@ export default function AnalyticsPage() {
       </div>
 
       <a
-        href={`${EXPLORER}/address/0x0747EEf0706327138c69792bF28Cd525089e4583`}
+        href={`${EXPLORER}/address/${JOB_CONTRACT}`}
         target="_blank"
         rel="noopener noreferrer"
         className="eyebrow"
         style={{
           display: "block",
           textAlign: "center",
-          padding: "24px 0 40px",
+          padding: "26px 0 44px",
         }}
       >
         View ERC-8183 contract on ArcScan

@@ -29,7 +29,10 @@ export type StatsSnapshot = {
   total_volume_usdc: string;
   events_24h: number;
   latest_block: number;
+  cached_events?: number;
 };
+
+export type ByType = Record<string, number>;
 
 export type NarrationResponse = {
   headline: string;
