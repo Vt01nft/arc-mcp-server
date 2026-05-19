@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAccount, useWriteContract } from "wagmi";
 import { useCircle } from "@/components/CircleProvider";
@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI, USDC_ABI } from "@/contracts/abis";
 import { publicClient } from "@/lib/viem";
+import { agentByWallet } from "@/lib/agents";
 import type { EvaluateResponse } from "@/lib/types";
 
 type JobData = {
@@ -47,6 +48,170 @@ type JobData = {
 
 const ZERO_BYTES32 =
   "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+function looksLikeHtml(c: string): boolean {
+  const s = c.trim();
+  return (
+    /^<!doctype html/i.test(s) ||
+    /<html[\s>][\s\S]*<\/html>/i.test(s) ||
+    (/<body[\s>]/i.test(s) && /<\/body>/i.test(s))
+  );
+}
+
+// Renders the agent's deliverable: live sandboxed preview for single-file
+// HTML, readable source for everything else, plus a one-click download.
+function DeliverableView({
+  jobId,
+  deliverable,
+}: {
+  jobId: number;
+  deliverable: {
+    ipfs_cid: string | null;
+    content_preview: string | null;
+    submitted_at: string;
+  };
+}) {
+  const content = deliverable.content_preview ?? "";
+  const isHtml = content.length > 0 && looksLikeHtml(content);
+  const [showSource, setShowSource] = useState(!isHtml);
+  const [copied, setCopied] = useState(false);
+  const ext = isHtml ? "html" : "md";
+
+  function download() {
+    const blob = new Blob([content], {
+      type: isHtml ? "text/html" : "text/markdown",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `deliverable-job-${jobId}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard may be blocked; download still works */
+    }
+  }
+
+  return (
+    <div className="paper-card-soft">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <h2 className="eyebrow accent" style={{ margin: 0 }}>
+          Submitted Deliverable
+        </h2>
+        {content && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {isHtml && (
+              <button
+                className="btn btn-ghost"
+                style={{ height: 34, padding: "0 12px", fontSize: 12 }}
+                onClick={() => setShowSource((v) => !v)}
+              >
+                {showSource ? "Preview" : "Source"}
+              </button>
+            )}
+            <button
+              className="btn btn-ghost"
+              style={{ height: 34, padding: "0 12px", fontSize: 12 }}
+              onClick={copy}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <button
+              className="btn btn-primary"
+              style={{ height: 34, padding: "0 12px", fontSize: 12 }}
+              onClick={download}
+            >
+              Download .{ext}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {content ? (
+        isHtml && !showSource ? (
+          <iframe
+            title={`Deliverable preview for job ${jobId}`}
+            srcDoc={content}
+            sandbox="allow-scripts allow-forms allow-popups"
+            style={{
+              width: "100%",
+              height: 480,
+              border: "1px solid var(--rule)",
+              background: "#fff",
+              borderRadius: 0,
+            }}
+          />
+        ) : (
+          <pre
+            style={{
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: "var(--ink-2)",
+              background: "var(--paper-2, rgba(0,0,0,0.03))",
+              padding: 14,
+              maxHeight: 480,
+              overflow: "auto",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              margin: 0,
+              fontFamily: "var(--mono)",
+            }}
+          >
+            {content}
+          </pre>
+        )
+      ) : (
+        <p style={{ fontSize: 14, color: "var(--ink-2)" }}>
+          The deliverable hash is on-chain. Readable content was not stored
+          off-chain for this job.
+        </p>
+      )}
+
+      {content.length >= 200000 && (
+        <p
+          className="eyebrow"
+          style={{ marginTop: 10, textTransform: "none", letterSpacing: 0 }}
+        >
+          Preview is truncated to the stored excerpt. Large multi-file output
+          is hosted in a later phase.
+        </p>
+      )}
+      {deliverable.ipfs_cid && (
+        <a
+          href={`https://ipfs.io/ipfs/${deliverable.ipfs_cid}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mono link-underline"
+          style={{ fontSize: 12, display: "inline-block", marginTop: 10 }}
+        >
+          ipfs://{deliverable.ipfs_cid}
+        </a>
+      )}
+      <p
+        className="eyebrow"
+        style={{ marginTop: 10, textTransform: "none", letterSpacing: 0 }}
+      >
+        Submitted {new Date(deliverable.submitted_at).toLocaleString()}
+      </p>
+    </div>
+  );
+}
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -110,6 +275,36 @@ export default function JobDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  const refetch = useCallback(async () => {
+    if (!id) return;
+    try {
+      const r = await fetch(`/api/jobs/${id}`, { cache: "no-store" });
+      const data = await r.json();
+      if (!data.error) setJob(data);
+    } catch {
+      /* keep current state on transient failure */
+    }
+  }, [id]);
+
+  // While an autonomous agent job is mid-flight, poll until it settles so the
+  // poster watches it complete without manually refreshing.
+  useEffect(() => {
+    if (!job) return;
+    const st = job.chain.status;
+    const isAgent = !!agentByWallet(job.chain.provider);
+    if (!isAgent || st === 3 || st === 4 || st === 5) return;
+    let n = 0;
+    const t = setInterval(() => {
+      n += 1;
+      if (n > 80) {
+        clearInterval(t);
+        return;
+      }
+      refetch();
+    }, 6000);
+    return () => clearInterval(t);
+  }, [job, refetch]);
 
   async function handleEvaluate() {
     if (!job?.metadata || !job.deliverable) return;
@@ -313,19 +508,68 @@ export default function JobDetailPage() {
             {[
               { label: "Client", value: chain.client },
               { label: "Provider", value: chain.provider },
+              ...(agentByWallet(chain.provider)
+                ? [
+                    {
+                      label: "Agent",
+                      value: agentByWallet(chain.provider)!.name,
+                      raw: true,
+                    },
+                  ]
+                : []),
               { label: "Evaluator", value: chain.evaluator },
               { label: "Expires", value: expiryDate },
-            ].map(({ label, value }) => (
+            ].map(({ label, value, raw }) => (
               <tr key={label}>
                 <td className="role" style={{ width: 140 }}>
                   {label}
                 </td>
-                <td className="addr">{fmtAddr(value)}</td>
+                <td className="addr">{raw ? value : fmtAddr(value)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Live state — autonomous agent working / evaluating */}
+      {agentByWallet(chain.provider) &&
+        (chain.status === 0 || chain.status === 1 || chain.status === 2) && (
+          <div
+            className="paper-card-soft"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              borderLeft: "3px solid var(--accent)",
+            }}
+          >
+            <span
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: 999,
+                background: "var(--accent)",
+                animation: "pulse 1.2s ease-in-out infinite",
+                flexShrink: 0,
+              }}
+            />
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+              {chain.status === 2 ? (
+                <>
+                  <b>{agentByWallet(chain.provider)!.name}</b> submitted the work.
+                  The evaluator is reviewing it now. This page updates
+                  automatically.
+                </>
+              ) : (
+                <>
+                  <b>{agentByWallet(chain.provider)!.name}</b> is working on this
+                  job now. It will submit, get reviewed, and pay out on its own.
+                  This page updates automatically, no refresh needed.
+                </>
+              )}
+            </p>
+          </div>
+        )}
 
       {/* How this works — status + role aware */}
       <div className="paper-card-soft" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -508,40 +752,7 @@ export default function JobDetailPage() {
 
       {/* Submitted deliverable view */}
       {deliverable && (
-        <div className="paper-card-soft">
-          <h2 className="eyebrow accent" style={{ marginBottom: 12 }}>
-            Submitted Deliverable
-          </h2>
-          {deliverable.content_preview && (
-            <p
-              style={{
-                fontSize: 15,
-                lineHeight: 1.6,
-                color: "var(--ink-2)",
-                marginBottom: 12,
-              }}
-            >
-              {deliverable.content_preview}
-            </p>
-          )}
-          {deliverable.ipfs_cid && (
-            <a
-              href={`https://ipfs.io/ipfs/${deliverable.ipfs_cid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mono link-underline"
-              style={{ fontSize: 12 }}
-            >
-              ipfs://{deliverable.ipfs_cid}
-            </a>
-          )}
-          <p
-            className="eyebrow"
-            style={{ marginTop: 10, textTransform: "none", letterSpacing: 0 }}
-          >
-            Submitted {new Date(deliverable.submitted_at).toLocaleString()}
-          </p>
-        </div>
+        <DeliverableView jobId={chain.id} deliverable={deliverable} />
       )}
 
       {/* Evaluator panel - visible when Submitted (status 2) */}

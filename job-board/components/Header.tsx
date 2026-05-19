@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArcLogo } from "./ArcLogo";
 import { CircleButton } from "./CircleButton";
 import { FaucetButton } from "./FaucetButton";
+import { NotificationBell } from "./NotificationBell";
 
 const DOCS_URL = "https://arc.network";
 const EXPLORER_URL = "https://testnet.arcscan.app";
@@ -50,6 +51,7 @@ export function Header() {
           >
             Analytics
           </a>
+          <NotificationBell />
           <CircleButton />
         </span>
       </div>

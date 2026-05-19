@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       job_id: jobRow.id,
       chain_job_id: chainJobId,
       deliverable_hash: hash,
-      content_preview: content.slice(0, 2000),
+      content_preview: content.slice(0, 200000),
       ipfs_cid: isIpfs ? content.replace("ipfs://", "") : null,
     });
     if (error) {

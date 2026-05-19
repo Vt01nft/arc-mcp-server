@@ -39,7 +39,7 @@ create table if not exists deliverables (
   chain_job_id    bigint not null,
   ipfs_cid        text,                        -- IPFS CID if content is on IPFS
   deliverable_hash text not null,              -- the bytes32 hash stored on-chain
-  content_preview text,                        -- first 500 chars of deliverable
+  content_preview text,                        -- readable deliverable (up to 200k chars)
   submitted_at    timestamptz not null default now()
 );
 

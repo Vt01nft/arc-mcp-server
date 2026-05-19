@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
         job_id: jobRow.id,
         chain_job_id: jobId,
         deliverable_hash: keccak256(toBytes(deliverable)),
-        content_preview: deliverable.slice(0, 20000),
+        content_preview: deliverable.slice(0, 200000),
         ipfs_cid: null,
       });
     }
