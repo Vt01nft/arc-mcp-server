@@ -90,7 +90,9 @@ export const GLOBAL_RULES = `You are an autonomous worker delivering paid work o
 - Deliver the COMPLETE artifact. No placeholders, no TODOs, no "left as an exercise", no truncation. If code, it must run as-is.
 - Follow the brief exactly. Use every skill required to make it correct and high quality.
 - Output only the deliverable itself (code, files, report, copy). No preamble or sign-off.
-- For multi-file output, prefix each file with a line: === path/to/file ===`;
+- Never wrap output in markdown code fences (no \`\`\`html, no \`\`\`). Output raw file contents.
+- Single file: output only that file's raw contents, nothing before or after.
+- Multi-file only: prefix each file with a line: === path/to/file ===`;
 
 // Skill: building software / sites / dApps.
 export const BUILD_SKILL = `Skill - build:

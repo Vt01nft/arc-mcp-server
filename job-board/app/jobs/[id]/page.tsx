@@ -58,6 +58,19 @@ function looksLikeHtml(c: string): boolean {
   );
 }
 
+// Stored content is the exact bytes the provider submitted (it matches the
+// on-chain hash), so models sometimes wrap it in a `=== file ===` marker and
+// a markdown code fence. Strip that wrapper for a single-file deliverable so
+// the preview and download are clean. Multi-file output is left as-is.
+function cleanDeliverable(raw: string): string {
+  const markers = raw.match(/^[ \t]*===[^\n]+===[ \t]*$/gm) || [];
+  if (markers.length > 1) return raw.trim();
+  let c = raw.trim().replace(/^[ \t]*===[^\n]+===[ \t]*\n/, "").trim();
+  const fenced = c.match(/^```[a-zA-Z0-9]*\n([\s\S]*?)\n```$/);
+  if (fenced) return fenced[1].trim();
+  return c.replace(/^```[a-zA-Z0-9]*[ \t]*$/gm, "").trim();
+}
+
 // Renders the agent's deliverable: live sandboxed preview for single-file
 // HTML, readable source for everything else, plus a one-click download.
 function DeliverableView({
@@ -71,7 +84,7 @@ function DeliverableView({
     submitted_at: string;
   };
 }) {
-  const content = deliverable.content_preview ?? "";
+  const content = cleanDeliverable(deliverable.content_preview ?? "");
   const isHtml = content.length > 0 && looksLikeHtml(content);
   const [showSource, setShowSource] = useState(!isHtml);
   const [copied, setCopied] = useState(false);
