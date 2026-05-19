@@ -137,7 +137,14 @@ export async function POST(req: NextRequest) {
         score?: number;
         issues?: string;
       };
-      if (v.complete === false || (typeof v.score === "number" && v.score < 0.7)) {
+      // Only spend a second full generation when the output is both weak
+      // and short. A large deliverable redo is the main cause of the
+      // function timing out; the evaluator is the real quality gate.
+      if (
+        deliverable.length < 6000 &&
+        (v.complete === false ||
+          (typeof v.score === "number" && v.score < 0.7))
+      ) {
         deliverable = await callAgent(
           agent,
           system,
@@ -181,6 +188,7 @@ export async function POST(req: NextRequest) {
 
     // 5) Gemini evaluation (advisory).
     let decision: "approve" | "reject" = "reject";
+    let evaluated = false;
     let reasoningText = "Evaluator could not assess the deliverable.";
     try {
       const er = await geminiJSON(
@@ -196,7 +204,10 @@ export async function POST(req: NextRequest) {
         reasoning?: string;
         confidence?: number;
       };
-      decision = e.decision === "approve" ? "approve" : "reject";
+      if (e.decision === "approve" || e.decision === "reject") {
+        decision = e.decision;
+        evaluated = true;
+      }
       reasoningText = (e.reasoning ?? reasoningText).slice(0, 1000);
       if (jobRow) {
         await db.from("evaluations").insert({
@@ -215,26 +226,37 @@ export async function POST(req: NextRequest) {
       /* default reject if evaluation fails */
     }
 
-    // 6) Evaluator wallet settles on-chain: release or refund.
-    const evalWallet = getWalletClient();
-    const settleHash = await evalWallet.writeContract({
-      address: ADDRESSES.ERC8183_JOB,
-      abi: ERC8183_ABI,
-      functionName: decision === "approve" ? "complete" : "reject",
-      args: [
-        BigInt(jobId),
-        reason(decision === "approve" ? "agent work approved" : "did not pass review"),
-        "0x",
-      ],
-    });
-    await publicClient.waitForTransactionReceipt({ hash: settleHash });
+    // 6) Evaluator wallet settles on-chain ONLY when the evaluator actually
+    // produced a decision. If evaluation could not run (timeout/outage), the
+    // work was still submitted on-chain, so leave the job Submitted for a
+    // human to review on the job page rather than auto-rejecting and
+    // refunding away completed work.
+    let settleHash: `0x${string}` | null = null;
+    if (evaluated) {
+      const evalWallet = getWalletClient();
+      settleHash = await evalWallet.writeContract({
+        address: ADDRESSES.ERC8183_JOB,
+        abi: ERC8183_ABI,
+        functionName: decision === "approve" ? "complete" : "reject",
+        args: [
+          BigInt(jobId),
+          reason(
+            decision === "approve"
+              ? "agent work approved"
+              : "did not pass review"
+          ),
+          "0x",
+        ],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: settleHash });
+    }
 
     // 6b) Pay the agent the bounty from the project pool on approval.
     // (Agent jobs are not client-funded ERC-8183 escrow because the contract
     // requires the client to sign fund(); the pool settles the real payout.)
     let payoutTx: string | null = null;
     const amt = Number(amountUsdc ?? "0");
-    if (decision === "approve" && amt > 0) {
+    if (evaluated && decision === "approve" && amt > 0) {
       try {
         const pool = getFaucetWalletClient();
         const bal = await publicClient.getBalance({
@@ -252,17 +274,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 7) Notify the poster (in-app always; email best-effort).
+    // 7) Notify the poster (in-app always; email best-effort). Three
+    // outcomes: completed, rejected, or submitted-pending-review.
+    const outcome = !evaluated
+      ? "pending"
+      : decision === "approve"
+      ? "completed"
+      : "rejected";
     const msg =
-      decision === "approve"
+      outcome === "completed"
         ? `Job #${jobId} completed by ${agent.name}. USDC released.`
-        : `Job #${jobId} was rejected on review by ${agent.name}. USDC refunded.`;
+        : outcome === "rejected"
+        ? `Job #${jobId} was rejected on review by ${agent.name}. USDC refunded.`
+        : `Job #${jobId}: ${agent.name} submitted the work. Automated review did not finish in time, so it is awaiting evaluation on the job page. No funds were moved.`;
     try {
       await db.from("notifications").insert({
         client_address: job.client.toLowerCase(),
         client_email: clientEmail ?? null,
         chain_job_id: jobId,
-        kind: decision === "approve" ? "completed" : "rejected",
+        kind: outcome === "completed" ? "completed" : outcome === "rejected" ? "rejected" : "submitted",
         message: msg,
       });
     } catch {
@@ -279,7 +309,13 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             from: "Arc Job Board <onboarding@resend.dev>",
             to: [clientEmail],
-            subject: `Your job #${jobId} is ${decision === "approve" ? "done" : "closed"}`,
+            subject: `Your job #${jobId} is ${
+              outcome === "completed"
+                ? "done"
+                : outcome === "rejected"
+                ? "closed"
+                : "submitted and awaiting review"
+            }`,
             text: `${msg}\n\n${reasoningText}\n\nView: https://arc-job-board.vercel.app/jobs/${jobId}`,
           }),
         });
@@ -292,7 +328,9 @@ export async function POST(req: NextRequest) {
       ok: true,
       agent: agent.name,
       usedModel,
-      decision,
+      outcome,
+      evaluated,
+      decision: evaluated ? decision : null,
       submitTx: submitHash,
       settleTx: settleHash,
       payoutTx,
