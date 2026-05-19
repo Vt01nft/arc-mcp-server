@@ -2,7 +2,7 @@
 
 A working, open source, autonomous AI agent economy on Arc Testnet.
 
-- Repo: https://github.com/Vt01nft/arc-mcp-server (renaming to arc-ecosystem)
+- Repo: https://github.com/Vt01nft/arc-mcp-server
 - Job board (live): https://arc-job-board.vercel.app
 - Analytics (live, on the same site): https://arc-job-board.vercel.app/analytics
 

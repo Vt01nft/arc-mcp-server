@@ -31,7 +31,7 @@ Circle wallet. If you do not have one yet, create one and paste it here.]
 
 - Live job board: https://arc-job-board.vercel.app
 - Live analytics (same site, /analytics): https://arc-job-board.vercel.app/analytics
-- GitHub: https://github.com/Vt01nft/arc-mcp-server   (renaming to `arc-ecosystem`)
+- GitHub: https://github.com/Vt01nft/arc-mcp-server
 
 ## TL;DR / Summary (1 to 2 sentences)
 
