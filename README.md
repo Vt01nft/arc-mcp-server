@@ -2,7 +2,7 @@
 
 A full-stack open source contribution to [Arc Network](https://arc.network) built for the [Arc Architects Program](https://arc.network/architects).
 
-Arc is a stablecoin-native Layer 1 blockchain built by Circle, where USDC is the native gas token. This repository contains four interconnected tools that demonstrate what real AI-native infrastructure looks like on Arc Testnet.
+Arc is a stablecoin-native Layer 1 blockchain built by Circle, where USDC is the native gas token. This repository is a single monorepo containing four interconnected tools plus an autonomous AI agent layer that all connect to Arc Testnet and do real work right now.
 
 ---
 
@@ -10,9 +10,9 @@ Arc is a stablecoin-native Layer 1 blockchain built by Circle, where USDC is the
 
 Most blockchain projects ship demos. This ships working infrastructure.
 
-Four phases. One monorepo. Every tool connects to Arc Testnet right now and does something real: reads live chain data, creates escrow jobs, evaluates deliverables using Gemini, votes on outcomes with a 3-agent jury, and visualizes everything on a live dashboard.
+A human signs in with email and a PIN (no browser wallet extension), posts a job with a USDC bounty, and the USDC is locked in an on-chain escrow contract. An autonomous AI agent picks up the job, does the work, checks its own output, a model evaluator judges it, and the escrow contract releases the USDC to the agent on approval or refunds the human on rejection. The human is notified by email and in-app. Every step is a real transaction on Arc Testnet.
 
-The goal is to show the Arc and Circle teams what becomes possible when you combine ERC-8183 job escrow, ERC-8004 agent identity, and AI evaluation in a single coherent stack.
+The goal is to show the Arc and Circle teams what becomes possible when you combine ERC-8183 job escrow, ERC-8004 agent identity, Circle Programmable Wallets, and AI evaluation in one coherent stack.
 
 ---
 
@@ -20,25 +20,26 @@ The goal is to show the Arc and Circle teams what becomes possible when you comb
 
 | Phase | Folder | What It Does | Status |
 |---|---|---|---|
-| 1 | `/` | MCP server - 21 tools for live Arc Testnet access | Live |
-| 2 | `/job-board` | Job marketplace where humans post tasks and AI agents complete them | Live: [arc-job-board.vercel.app](https://arc-job-board.vercel.app) |
-| 3 | `/multi-evaluator` | Smart contracts that replace a single evaluator with a 3-agent jury | Live on Arc Testnet |
-| 4 | `/analytics` | Live dashboard that tracks all onchain job activity and narrates it with Gemini | Live: [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app) |
+| 1 | `/` | MCP server, 21 tools for live Arc Testnet access | Live |
+| 2 | `/job-board` | Job marketplace: humans post, autonomous AI agents deliver, on-chain escrow settles | Live: [arc-job-board.vercel.app](https://arc-job-board.vercel.app) |
+| A | `/job-board` | Autonomous AI agent layer (6 agents, self-verify, AI evaluation, auto payout) | Live, verified on-chain |
+| 3 | `/multi-evaluator` | Contracts that replace one evaluator with a 3-agent jury | Live on Arc Testnet |
+| 4 | `/analytics` | Live dashboard that tracks all on-chain job activity and narrates it | Live: [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app) |
 
 ---
 
-## Phase 1 - Arc MCP Server
+## Phase 1, Arc MCP Server
 
 **The problem:** Developers and AI assistants have no direct way to interact with Arc Testnet from their tools.
 
-**What it does:** This is a Model Context Protocol (MCP) server that gives Claude Code and any MCP-compatible client 21 live tools for interacting with Arc Testnet. No need to write custom RPC calls or know the contract ABIs. You just ask Claude to do something and it does it.
+**What it does:** A Model Context Protocol (MCP) server that gives Claude Code and any MCP-compatible client 21 live tools for Arc Testnet. No custom RPC calls, no hand-written ABIs. You ask, it acts.
 
 **Tools included:**
 - Read live chain data: gas price, blocks, transactions, balances
 - Send and approve USDC transfers
-- Full ERC-8183 job lifecycle: create, fund, submit deliverable, complete, reject, refund
+- Full ERC-8183 job lifecycle: create, fund, submit, complete, reject, refund
 - ERC-8004 agent reputation: give feedback, read scores, request and respond to validations
-- Event history: scan any contract for events, get a full timeline for any specific job
+- Event history: scan any contract for events, full timeline for any job
 
 **Quick start:**
 
@@ -46,80 +47,99 @@ The goal is to show the Arc and Circle teams what becomes possible when you comb
 npm install
 npm run build
 claude mcp add arc-live node /absolute/path/to/dist/index.js
+node test.mjs   # live smoke test against Arc Testnet
 ```
-
-Once added, Claude can call tools like `arc_get_gas_price`, `arc_create_job`, and `arc_get_reputation` directly from any conversation.
-
-**Test against live chain:**
-
-```bash
-node test.mjs
-```
-
-This runs a live smoke test against Arc Testnet and prints real data including current gas price, latest block, and event counts.
 
 ---
 
-## Phase 2 - Arc Job Board
-
-**The problem:** There is no public marketplace where humans can post tasks for AI agents to complete, with real USDC on the line and an AI evaluator deciding the outcome.
+## Phase 2, Arc Job Board
 
 **Live:** [arc-job-board.vercel.app](https://arc-job-board.vercel.app)
 
-**What it does:** A Next.js web application where anyone can post a job with a USDC bounty and let the onchain escrow contract settle it. When the provider submits their deliverable, Gemini evaluates it and gives a recommendation, then the evaluator approves or rejects onchain, releasing or refunding the USDC.
+**The problem:** There is no public marketplace where a person can post a task, have an AI agent actually complete it, and have real USDC settled on-chain by an impartial evaluator, with no crypto wallet setup required.
 
-The deployed ERC-8183 contract is `AgenticCommerce` (an upgradeable proxy at `0x0747EEf0706327138c69792bF28Cd525089e4583`, implementation `0xa316fd02827242d537f84730f8a37d0ba5fd351a`). The app's ABI is taken verbatim from the verified contract on ArcScan, not hand-written.
+**What it does:** A Next.js application where you sign in with Circle (email plus a PIN, a user-controlled Circle Programmable Wallet on Arc Testnet, no extension). You post a job, set a USDC bounty, and an autonomous AI agent does the work. The deployed ERC-8183 contract holds the money and releases it only when the work is approved.
+
+**Sign-in:** Circle W3S user-controlled wallets are the only login. The server mints a session, the Circle SDK handles the PIN, and the user owns the key. The header shows the wallet address, the live Arc USDC balance, an in-app faucet, and a notification bell.
 
 **The real escrow lifecycle (verified end to end on Arc Testnet):**
-1. Client calls `createJob(provider, evaluator, expiredAt, description, hook)` - job opens with budget 0
-2. Provider calls `setBudget` to quote the USDC price for the job
-3. Client `approve`s USDC then calls `fund`, which pulls the budget into escrow via `transferFrom` and moves the job to Funded
-4. Provider calls `submit` with the deliverable hash
-5. Gemini evaluates the deliverable against the description (`POST /api/evaluate`)
-6. Evaluator calls `complete` (pays the provider) or `reject` (refunds the client)
+1. Client calls `createJob(provider, evaluator, expiredAt, description, hook)`, the job opens with budget 0
+2. The provider (the AI agent, server-signed) calls `setBudget` to quote the USDC price
+3. Client `approve`s USDC once (a standing allowance) then calls `fund`, which pulls the budget into escrow via `transferFrom` and moves the job to Funded
+4. The agent calls `submit` with the deliverable hash
+5. A model evaluator scores the deliverable against the brief
+6. The evaluator wallet calls `complete` (the contract pays the agent from escrow) or `reject` (the contract refunds the client automatically)
 
-Browse Jobs reads Supabase metadata merged with an onchain fallback (jobs whose offchain save failed still appear, scanned from `JobCreated` logs).
+The deployed ERC-8183 contract is `AgenticCommerce` (upgradeable proxy `0x0747EEf0706327138c69792bF28Cd525089e4583`, implementation `0xa316fd02827242d537f84730f8a37d0ba5fd351a`). The ABI is taken verbatim from the verified contract on ArcScan.
 
-**Tech stack:** Next.js 16, wagmi v3, RainbowKit, viem, Supabase, Anthropic SDK, Tailwind v4
+**What the poster gets:** an email and an in-app notification when the job is done, approved, or refunded. The job page shows the deliverable with a sandboxed live preview for single-file HTML, a source toggle, copy, and a one-click download. It also shows which agent did the work and the evaluator reasoning.
+
+**Tech stack:** Next.js 16 (App Router), viem, Circle W3S Programmable Wallets, Supabase, Google Gemini, OpenRouter, Resend, Tailwind v4.
 
 **Run locally:**
 
 ```bash
 cd job-board
 npm install
-cp .env.example .env.local
-# Fill in your env vars
+cp .env.example .env.local   # fill in the env vars
 npm run dev
 ```
 
-**Deploy:** Vercel and Supabase. The Vercel project Root Directory is `job-board`, so deploy from the repo root. Run `job-board/supabase/schema.sql` in the Supabase SQL editor before first use.
+Run `job-board/supabase/schema.sql` in the Supabase SQL editor before first use. The Vercel project Root Directory is `job-board`, so deploy from the repo root.
 
 ---
 
-## Phase 3 - Arc Multi-Evaluator
+## Phase A, Autonomous AI Agents
 
-**The problem:** A single evaluator is a single point of failure. One bad actor or one mistake can make or break a job outcome.
+This is the layer that makes the job board autonomous. It lives inside `/job-board` (`lib/agents.ts`, `lib/ai.ts`, `app/api/agent/*`, `app/api/route-agent`).
 
-**What it does:** Three Solidity contracts that replace a single evaluator with a 3-agent jury system. When a deliverable is submitted, the hook automatically selects 3 registered evaluators from a staking registry, gives them 48 hours to vote, and resolves at 2-of-3. Correct voters earn a 5% fee split. Incorrect voters lose 10% of their stake. There is also a time-locked stake escrow contract that lets evaluators lock USDC for up to one year to boost their jury selection weight.
+**Six agents, each a wallet plus a model.** No per-agent contracts. The agent's wallet is its on-chain identity (ERC-8004 style), and the wallet address recorded as the job provider is what selects the agent.
+
+| Agent | Model | Reached via |
+|---|---|---|
+| Gemini | gemini-2.5-flash | Google Gemini API directly |
+| MiMo (Xiaomi) | xiaomi/mimo-v2.5 | OpenRouter |
+| Llama 3 (70B) | meta-llama/llama-3.3-70b-instruct | OpenRouter |
+| Kimi (Moonshot) | moonshotai/kimi-k2 | OpenRouter |
+| Claude | anthropic/claude-sonnet-4.5 | OpenRouter |
+| OpenAI | openai/gpt-4o-mini | OpenRouter |
+
+**Routing:** the poster picks an agent, or picks Auto and a model routes the job to the best-fit agent (UI and website work biases to Gemini, security audits to Claude).
+
+**The autonomous loop (`POST /api/agent/run`):**
+1. Read the job on-chain, resolve which agent is the provider
+2. The agent does the work from a strict system prompt (no em or en dashes, no generic AI tone, complete production output, no placeholders)
+3. The agent self-verifies its own output and redoes weak short output once
+4. It submits the deliverable hash on-chain from its own wallet
+5. A model evaluator judges it against the brief
+6. The evaluator wallet calls `complete` or `reject`. On approve the ERC-8183 contract releases the escrowed USDC to the agent. On reject it refunds the client. The project pool is only used as a fallback for legacy jobs that were never escrow-funded
+7. The poster is notified by email and in-app
+
+**Two skills:** a build skill (production single-file or multi-file software, sites, dApps) and a security audit skill (a two-pass, eight-section methodology for auditing a website or a GitHub repo).
+
+**Resilience:** the evaluator, self-verify, and router try Gemini first and fail over to OpenRouter automatically, so a Gemini outage or rate limit does not stall jobs. If the automated evaluation cannot complete in time, the job is left Submitted for review rather than being auto-rejected, so completed work is never discarded and funds are never lost.
+
+**Verified on-chain:** the full loop has been proven end to end on Arc Testnet for both the direct-Gemini path and the OpenRouter path, including the client-funded escrow being debited from the poster and released to the agent on approval (and refunded on rejection).
+
+---
+
+## Phase 3, Arc Multi-Evaluator
+
+**The problem:** A single evaluator is a single point of failure.
+
+**What it does:** Three Solidity contracts that replace one evaluator with a 3-agent jury. When a deliverable is submitted, the hook selects 3 registered evaluators from a staking registry, gives them 48 hours to vote, and resolves at 2-of-3. Correct voters earn a 5% fee split, incorrect voters lose 10% of stake. A time-locked stake vault lets evaluators lock USDC for up to a year to boost their jury selection weight.
 
 **Contracts:**
-- `MultiEvaluatorHook.sol` - The ERC-8183 hook. Handles jury selection, vote collection, fee distribution, and outcome resolution.
-- `EvaluatorRegistry.sol` - Manages evaluator registration, staking, slashing, and rewards. Evaluators must stake at least 10 USDC to participate.
-- `VoteEscrow.sol` - Time-locked stake vault. Longer locks give higher jury selection weight, from 1x at 7 days to 4x at 1 year.
+- `MultiEvaluatorHook.sol`, the ERC-8183 hook (jury selection, vote collection, fee distribution, resolution)
+- `EvaluatorRegistry.sol`, evaluator registration, staking, slashing, rewards (minimum 10 USDC stake)
+- `VoteEscrow.sol`, time-locked stake vault, 1x at 7 days up to 4x at 1 year
 
-**Build and test:**
+**Build, test, deploy:**
 
 ```bash
 cd multi-evaluator
-# Install Foundry from https://getfoundry.sh
 forge install foundry-rs/forge-std
-forge build
-forge test
-```
-
-**Deploy to Arc Testnet:**
-
-```bash
+forge build && forge test
 forge script script/Deploy.s.sol --rpc-url arc_testnet --broadcast --private-key $PRIVATE_KEY
 ```
 
@@ -131,42 +151,30 @@ forge script script/Deploy.s.sol --rpc-url arc_testnet --broadcast --private-key
 | MultiEvaluatorHook | `0x2DdF3599CAD71B5541eb8902819D78d3E29049C1` |
 | VoteEscrow | `0x7b59b4deBB8B986C639E81F4C3235366647bf640` |
 
-Verified on-chain: `EvaluatorRegistry.hook()` returns the deployed `MultiEvaluatorHook`
-address, confirming the nonce-predicted circular-dependency resolution held on a real chain.
-`demo/addresses.ts` is already populated - run the TypeScript demo to see the full jury lifecycle.
+`EvaluatorRegistry.hook()` returns the deployed `MultiEvaluatorHook` address, confirming the nonce-predicted circular-dependency resolution held on a real chain. `demo/addresses.ts` is populated, run the TypeScript demo to see the full jury lifecycle.
 
 ---
 
-## Phase 4 - Arc Analytics
+## Phase 4, Arc Analytics
 
 **Live:** [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app)
 
-**The problem:** There is no easy way to see what is happening on Arc Testnet at a glance, and no tool that explains trends in plain language.
+**What it does:** A live dashboard that syncs the deployed ERC-8183 events from Arc Testnet into Supabase, shows them as charts and an event feed, and lets you ask a model to narrate the current state of the ecosystem in two sentences. It tracks total jobs, USDC volume, active escrows, and daily activity across the whole shared contract, not just this app's jobs.
 
-**What it does:** A live dashboard that syncs the deployed AgenticCommerce (ERC-8183) events from Arc Testnet into Supabase, displays them as bar charts and an event feed, and lets you ask Gemini to narrate the current state of the ecosystem in two sentences. It shows total jobs, USDC volume, active escrows, and daily activity trends across the whole shared contract, not just this app's jobs.
-
-**Key features:**
-- Sync pulls the last ~50,000 blocks of events in paginated chunks, deduped before upsert; a Vercel Cron re-syncs daily and `POST /api/sync` triggers it on demand
-- Event signatures are taken from the verified onchain contract (a wrong signature changes the log topic and silently returns nothing)
-- Bar chart shows daily job creation, completion, and rejection counts
-- Live event feed shows the most recent onchain activity with block numbers and transaction links
-- Gemini narration generates a headline and two-sentence summary of current ecosystem health
-
-**Run locally:**
+- Sync pulls the last ~50,000 blocks in paginated chunks, deduped before upsert, with a daily Vercel Cron and an on-demand `POST /api/sync`
+- Event signatures come from the verified on-chain contract
+- Daily bar chart, live event feed with block numbers and tx links, model-generated narration
 
 ```bash
 cd analytics
 npm install
 cp .env.example .env.local
-# Fill in Supabase and Anthropic keys
-npm run dev
+npm run dev   # run analytics/supabase/schema.sql first
 ```
-
-Run `analytics/supabase/schema.sql` in your Supabase SQL editor first to create the `event_cache` and `narrations` tables.
 
 ---
 
-## Chain Details - Arc Testnet
+## Chain Details, Arc Testnet
 
 | Field | Value |
 |---|---|
@@ -185,10 +193,24 @@ Run `analytics/supabase/schema.sql` in your Supabase SQL editor first to create 
 | ERC-8004 Reputation | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
 | ERC-8004 Validation | `0x8004Cb1BF31DAf7788923b405b754f57acEB4272` |
 | USDC | `0x3600000000000000000000000000000000000000` |
-| Multi-Evaluator (Phase 3) | see the Phase 3 table above |
+| Multi-Evaluator (Phase 3) | see the Phase 3 table |
+
+---
+
+## Repository Layout
+
+```
+arc-mcp-server/
+  src/             Phase 1, MCP server (TypeScript)
+  job-board/       Phase 2 and Phase A, Next.js app + autonomous agents
+  multi-evaluator/ Phase 3, Foundry Solidity contracts
+  analytics/       Phase 4, Next.js analytics dashboard
+  test.mjs         Phase 1 live chain test
+  README.md
+```
 
 ---
 
 ## Security
 
-Private keys and API keys are never committed to this repository. All sensitive values go in `.env.local` files which are listed in every `.gitignore`. For production deployments, set environment variables in the Vercel dashboard or your deployment platform of choice.
+Private keys and API keys are never committed. Every secret lives in a `.env.local` file that is listed in `.gitignore`, and production secrets are set in the deployment platform. The faucet uses a dedicated wallet isolated from the deployer and evaluator keys. Supabase row-level security is enabled on every public table. For deployments, set environment variables in the Vercel dashboard.
