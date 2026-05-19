@@ -18,6 +18,7 @@ import {
   SECURITY_AUDIT_SKILL,
 } from "@/lib/agents";
 import { callAgent, resilientJSON } from "@/lib/ai";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const maxDuration = 300;
 
@@ -62,6 +63,8 @@ async function fetchTarget(desc: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, "agent-run", 12, 60_000);
+  if (limited) return limited;
   try {
     const { jobId, clientEmail, amountUsdc } = (await req.json()) as {
       jobId?: number;

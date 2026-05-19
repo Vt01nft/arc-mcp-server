@@ -4,6 +4,7 @@ import { publicClient, getSignerFromEnv } from "@/lib/viem";
 import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI } from "@/contracts/abis";
 import { agentByWallet } from "@/lib/agents";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const maxDuration = 60;
 
@@ -24,6 +25,8 @@ type Job = {
 // Agent wallets are server-controlled, so the client calls this right after
 // createJob; then the client approves + funds from their own wallet.
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, "set-budget", 12, 60_000);
+  if (limited) return limited;
   try {
     const { jobId, amountUsdc } = (await req.json()) as {
       jobId?: number;

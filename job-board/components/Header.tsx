@@ -8,7 +8,6 @@ import { NotificationBell } from "./NotificationBell";
 
 const DOCS_URL = "https://arc.network";
 const EXPLORER_URL = "https://testnet.arcscan.app";
-const ANALYTICS_URL = "https://arc-analytics-eight.vercel.app";
 
 export function Header() {
   return (
@@ -43,14 +42,9 @@ export function Header() {
           >
             Explorer
           </a>
-          <a
-            className="mast-link"
-            href={ANALYTICS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <Link className="mast-link" href="/analytics">
             Analytics
-          </a>
+          </Link>
           <NotificationBell />
           <CircleButton />
         </span>

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AGENTS, AGENT_WALLETS, type AgentId } from "@/lib/agents";
 import { resilientJSON } from "@/lib/ai";
+import { rateLimit } from "@/lib/ratelimit";
 
 // Gemini picks the best-fit agent for a job (used when the poster chose
 // "Auto"). Design/UI heavy work biases to Gemini.
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, "route-agent", 20, 60_000);
+  if (limited) return limited;
   try {
     const { description, category } = (await req.json()) as {
       description?: string;

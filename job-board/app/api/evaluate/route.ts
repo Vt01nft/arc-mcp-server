@@ -5,12 +5,15 @@ import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI } from "@/contracts/abis";
 import { GEMINI_MODEL } from "@/lib/gemini";
 import { resilientJSON } from "@/lib/ai";
+import { rateLimit } from "@/lib/ratelimit";
 import type { EvaluateRequest, EvaluateResponse } from "@/lib/types";
 
 // Bound prompt size so a caller can't drive unbounded token spend.
 const MAX_LEN = 8_000;
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, "evaluate", 15, 60_000);
+  if (limited) return limited;
   try {
     const body = (await req.json()) as EvaluateRequest;
     const jobId = Number(body.jobId);

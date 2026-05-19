@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Block committing env files and obvious private keys.
+# Enable once per clone:  git config core.hooksPath .githooks
+set -euo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+# 1) Never commit real env files (only *.example is allowed).
+bad_files=$(echo "$staged" | grep -E '(^|/)\.env(\.|$)|\.env\.local$' | grep -v '\.example$' || true)
+if [ -n "$bad_files" ]; then
+  echo "BLOCKED: attempting to commit env file(s):"
+  echo "$bad_files"
+  echo "Move secrets to .env.local (gitignored) and keep only .env.example."
+  exit 1
+fi
+
+# 2) Scan staged content for a 64-hex private key or common secret prefixes.
+if git diff --cached -U0 --no-color | grep -nE '0x[a-fA-F0-9]{64}|sk-[a-zA-Z0-9]{20,}|sk-ant-|sbp_[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}' >/dev/null; then
+  echo "BLOCKED: a private key or secret-looking token is in the staged diff."
+  echo "Remove it (use an env var) or, if it is a false positive, commit with --no-verify."
+  exit 1
+fi
+
+exit 0
