@@ -62,7 +62,15 @@ export default function PostJobPage() {
     amountUsdc: "",
     expiryHours: 72,
     agent: "auto",
+    email: "",
   });
+  // Prefill the alert email with the Circle login email once it loads,
+  // but let the user override it.
+  useEffect(() => {
+    if (circle.email) {
+      setForm((p) => (p.email ? p : { ...p, email: circle.email as string }));
+    }
+  }, [circle.email]);
   const [agents, setAgents] = useState<
     { id: string; name: string; address: string; available: boolean }[]
   >([]);
@@ -204,34 +212,58 @@ export default function PostJobPage() {
           form.description
         );
 
-        // Real client-funded ERC-8183 escrow only works when you are the
-        // provider (contract requires provider setBudget + client fund).
+        // Real client-funded ERC-8183 escrow. The provider must quote the
+        // price (setBudget) before the client can fund. For an agent job the
+        // agent wallet is server-controlled, so the server quotes it; you
+        // then approve + fund from your own wallet, which debits your USDC
+        // into the contract. complete() later releases it to the agent
+        // automatically; a reject refunds you.
         const amount = form.amountUsdc.trim();
-        if (
-          isCustom &&
-          jobId != null &&
-          Number(amount) > 0 &&
-          circle.address?.toLowerCase() === providerAddr.toLowerCase()
-        ) {
+        const isSelf =
+          circle.address?.toLowerCase() === providerAddr.toLowerCase();
+        const wantEscrow = jobId != null && Number(amount) > 0;
+        if (wantEscrow) {
           const raw = parseUnits(amount, 6);
-          await circle.execute({
-            address: ADDRESSES.ERC8183_JOB,
-            abi: ERC8183_ABI,
-            functionName: "setBudget",
-            args: [BigInt(jobId!), raw, "0x"],
-          });
-          await circle.execute({
-            address: ADDRESSES.USDC,
-            abi: USDC_ABI,
-            functionName: "approve",
-            args: [ADDRESSES.ERC8183_JOB, raw],
-          });
-          await circle.execute({
-            address: ADDRESSES.ERC8183_JOB,
-            abi: ERC8183_ABI,
-            functionName: "fund",
-            args: [BigInt(jobId!), "0x"],
-          });
+          let budgetSet = false;
+
+          if (!isCustom) {
+            // Agent job: server signs setBudget with the agent's wallet.
+            const sb = await fetch("/api/agent/set-budget", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jobId, amountUsdc: amount }),
+            }).then((x) => x.json());
+            if (!sb.ok) {
+              throw new Error(sb.error || "Could not set the escrow budget.");
+            }
+            budgetSet = true;
+          } else if (isSelf) {
+            // Self-assigned (testing): you are the provider, you quote it.
+            await circle.execute({
+              address: ADDRESSES.ERC8183_JOB,
+              abi: ERC8183_ABI,
+              functionName: "setBudget",
+              args: [BigInt(jobId!), raw, "0x"],
+            });
+            budgetSet = true;
+          }
+          // Custom address that is not you: that provider sets the budget
+          // and you fund from the job page (cannot sign for their wallet).
+
+          if (budgetSet) {
+            await circle.execute({
+              address: ADDRESSES.USDC,
+              abi: USDC_ABI,
+              functionName: "approve",
+              args: [ADDRESSES.ERC8183_JOB, raw],
+            });
+            await circle.execute({
+              address: ADDRESSES.ERC8183_JOB,
+              abi: ERC8183_ABI,
+              functionName: "fund",
+              args: [BigInt(jobId!), "0x"],
+            });
+          }
         }
 
         await fetch("/api/jobs/save", {
@@ -243,7 +275,7 @@ export default function PostJobPage() {
             category: form.category,
             clientAddress: circle.address,
             providerAddress: providerAddr,
-            clientEmail: circle.email,
+            clientEmail: form.email || circle.email,
             agent: form.agent,
           }),
         }).catch(() => {});
@@ -255,7 +287,7 @@ export default function PostJobPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               jobId,
-              clientEmail: circle.email,
+              clientEmail: form.email || circle.email,
               amountUsdc: amount,
             }),
           }).catch(() => {});
@@ -427,10 +459,32 @@ export default function PostJobPage() {
               className="eyebrow"
               style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
             >
-              If you set this and your wallet is also the provider address, the
-              USDC is escrowed now (set budget, approve, fund) in one flow.
-              Otherwise leave it blank and the provider sets the price, then you
-              fund from the job page.
+              For an agent job, this USDC is debited from your wallet into the
+              ERC-8183 escrow now: you sign create, then approve, then fund
+              (three PIN prompts). It is released to the agent automatically
+              when the work is approved, and refunded to you if it is rejected.
+              Leave it blank to post without escrow (the agent still does the
+              work; no payout).
+            </p>
+          </div>
+
+          <div>
+            <label className="label">Email for alerts</label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="you@example.com"
+              className="field"
+            />
+            <p
+              className="eyebrow"
+              style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
+            >
+              We email you here the moment the job is done, approved, or
+              refunded. Prefilled from your Circle sign-in; change it if you
+              want the alert somewhere else.
             </p>
           </div>
 

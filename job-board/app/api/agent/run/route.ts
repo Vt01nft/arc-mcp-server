@@ -251,12 +251,18 @@ export async function POST(req: NextRequest) {
       await publicClient.waitForTransactionReceipt({ hash: settleHash });
     }
 
-    // 6b) Pay the agent the bounty from the project pool on approval.
-    // (Agent jobs are not client-funded ERC-8183 escrow because the contract
-    // requires the client to sign fund(); the pool settles the real payout.)
+    // 6b) Payout. If the job was client-funded (budget > 0), complete()
+    // already released the escrowed USDC to the agent on-chain, so the pool
+    // must NOT pay again. The pool only covers legacy/no-escrow jobs
+    // (budget == 0) where the client did not lock funds.
     let payoutTx: string | null = null;
     const amt = Number(amountUsdc ?? "0");
-    if (evaluated && decision === "approve" && amt > 0) {
+    if (
+      evaluated &&
+      decision === "approve" &&
+      amt > 0 &&
+      job.budget === 0n
+    ) {
       try {
         const pool = getFaucetWalletClient();
         const bal = await publicClient.getBalance({
