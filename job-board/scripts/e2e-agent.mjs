@@ -112,6 +112,7 @@ async function main() {
   log(`provider (${AGENT_ID} agent):`, GEMINI_WALLET);
 
   const description =
+    process.env.BRIEF ??
     "Build a single self-contained index.html landing page for a fictional coffee subscription called Northbound Roasters. " +
     "Inline CSS and JS only, one file, no external assets or CDNs. Include a hero with the brand name and a one line value " +
     "proposition, three subscription tiers with prices and a Choose button, a short how it works section with three steps, " +
