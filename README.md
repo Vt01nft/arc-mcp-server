@@ -24,7 +24,7 @@ The goal is to show the Arc and Circle teams what becomes possible when you comb
 | 2 | `/job-board` | Job marketplace: humans post, autonomous AI agents deliver, on-chain escrow settles | Live: [arc-job-board.vercel.app](https://arc-job-board.vercel.app) |
 | A | `/job-board` | Autonomous AI agent layer (6 agents, self-verify, AI evaluation, auto payout) | Live, verified on-chain |
 | 3 | `/multi-evaluator` | Contracts that replace one evaluator with a 3-agent jury | Live on Arc Testnet |
-| 4 | `/analytics` | Live dashboard that tracks all on-chain job activity and narrates it | Live: [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app) |
+| 4 | `/job-board` (route) | Live dashboard that tracks all on-chain job activity and narrates it | Live: [arc-job-board.vercel.app/analytics](https://arc-job-board.vercel.app/analytics) |
 
 ---
 
@@ -157,9 +157,9 @@ forge script script/Deploy.s.sol --rpc-url arc_testnet --broadcast --private-key
 
 ## Phase 4, Arc Analytics
 
-**Live:** [arc-analytics-eight.vercel.app](https://arc-analytics-eight.vercel.app)
+**Live:** [arc-job-board.vercel.app/analytics](https://arc-job-board.vercel.app/analytics) (a route on the main site, same UI, no separate domain)
 
-**What it does:** A live dashboard that syncs the deployed ERC-8183 events from Arc Testnet into Supabase, shows them as charts and an event feed, and lets you ask a model to narrate the current state of the ecosystem in two sentences. It tracks total jobs, USDC volume, active escrows, and daily activity across the whole shared contract, not just this app's jobs.
+**What it does:** A live dashboard that syncs the deployed ERC-8183 events from Arc Testnet into Supabase, shows them as a chart and an event feed, and lets you ask a model to narrate the current state of the ecosystem in two sentences. It tracks total jobs, USDC volume, active escrows, and daily activity across the whole shared contract, not just this app's jobs. It now lives inside the job board (`job-board/app/analytics`, `job-board/app/api/analytics/*`) sharing the same Supabase, chain client, model failover, and editorial design. The `/analytics` standalone app folder remains as the Phase 4 reference implementation.
 
 - Sync pulls the last ~50,000 blocks in paginated chunks, deduped before upsert, with a daily Vercel Cron and an on-demand `POST /api/sync`
 - Event signatures come from the verified on-chain contract
@@ -213,4 +213,10 @@ arc-mcp-server/
 
 ## Security
 
-Private keys and API keys are never committed. Every secret lives in a `.env.local` file that is listed in `.gitignore`, and production secrets are set in the deployment platform. The faucet uses a dedicated wallet isolated from the deployer and evaluator keys. Supabase row-level security is enabled on every public table. For deployments, set environment variables in the Vercel dashboard.
+Private keys and API keys are never committed. Every secret lives in a `.env.local` file that is listed in `.gitignore`, and production secrets are set in the deployment platform. The faucet uses a dedicated wallet isolated from the deployer and evaluator keys. Supabase row-level security is enabled on every public table, and the unauthenticated model and chain-writing endpoints are rate limited.
+
+A full audit using a two-pass eight-section methodology is in [SECURITY-AUDIT.md](SECURITY-AUDIT.md). CI runs a gitleaks secret scan and a build on every push (`.github/workflows/ci.yml`). Enable the local pre-commit secret guard once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
