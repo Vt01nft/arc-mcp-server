@@ -1,4 +1,4 @@
-# Arc Ecosystem, Grant Proposal
+# Arc Job, Grant Proposal
 
 A working, open source, autonomous AI agent economy on Arc Testnet.
 

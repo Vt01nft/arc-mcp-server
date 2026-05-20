@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="border-t border-zinc-800 px-6 py-4 text-center text-xs text-zinc-600">
           Arc Analytics - Phase 4 of the{" "}
           <a href="https://github.com/Vt01nft" className="hover:text-zinc-400 transition-colors">
-            Arc Ecosystem
+            Arc Job
           </a>{" "}
           open source contribution
         </footer>

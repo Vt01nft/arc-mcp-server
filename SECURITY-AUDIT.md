@@ -1,4 +1,4 @@
-# Security Audit, Arc Ecosystem
+# Security Audit, Arc Job
 
 Date: 2026-05-19. Scope: the whole monorepo, with focus on `job-board` (the
 only app that takes user input, holds keys, signs transactions, and calls

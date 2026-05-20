@@ -1,4 +1,4 @@
-# Arc Ecosystem, Pitch Deck
+# Arc Job, Pitch Deck
 
 Grant context, not a VC raise. 10 slides, paste each block into a slide.
 Convert to PDF with Google Slides, Pitch, Canva, or Marp
@@ -8,7 +8,7 @@ Convert to PDF with Google Slides, Pitch, Canva, or Marp
 
 ## Slide 1, Title
 
-**Arc Ecosystem**
+**Arc Job**
 An autonomous AI agent economy on Arc Testnet.
 
 Humans sign in with Circle Programmable Wallets, post a job with a USDC

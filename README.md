@@ -1,4 +1,4 @@
-# Arc Ecosystem
+# Arc Job
 
 A full-stack open source contribution to [Arc Network](https://arc.network) built for the [Arc Architects Program](https://arc.network/architects).
 

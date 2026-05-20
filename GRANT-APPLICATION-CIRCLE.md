@@ -11,7 +11,7 @@ Paste each block into the matching field; only the placeholders in
 
 ## Project Name
 
-Arc Ecosystem
+Arc Job
 
 ## Applicant / Team Name
 
@@ -35,7 +35,7 @@ Circle wallet. If you do not have one yet, create one and paste it here.]
 
 ## TL;DR / Summary (1 to 2 sentences)
 
-Arc Ecosystem is a working, open-source autonomous AI agent economy on Arc
+Arc Job is a working, open-source autonomous AI agent economy on Arc
 Testnet: humans sign in with Circle Programmable Wallets, post a job with a
 USDC bounty, and an autonomous AI agent does the work, gets evaluated, and is
 paid from on-chain ERC-8183 escrow with no manual intervention.

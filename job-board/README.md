@@ -112,7 +112,7 @@ Explorer: [testnet.arcscan.app](https://testnet.arcscan.app)
 
 ---
 
-## Part of the Arc Ecosystem
+## Part of the Arc Job project
 
 This is Phase 2 of a 4-phase open source contribution to Arc Network:
 
