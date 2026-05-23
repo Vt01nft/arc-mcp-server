@@ -78,7 +78,19 @@ export async function GET(
         deliverable: ZERO_BYTES32,
         hook: chainJob.hook,
       },
-      metadata: metadata ?? null,
+      // Defense in depth: never echo client_email even if it still exists
+      // on an old row. The underlying jobs RLS read policy is the real
+      // gate (see SECURITY-AUDIT.md for the SQL migration).
+      metadata: metadata
+        ? (() => {
+            const { client_email: _drop, ...safe } = metadata as Record<
+              string,
+              unknown
+            >;
+            void _drop;
+            return safe;
+          })()
+        : null,
       evaluation: evaluation ?? null,
       deliverable: deliverable ?? null,
     });

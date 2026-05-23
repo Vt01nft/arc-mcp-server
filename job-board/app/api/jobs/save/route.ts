@@ -29,6 +29,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // client_email is no longer persisted to `jobs`: the public read RLS
+    // policy makes the entire row anon-readable via PostgREST, which would
+    // leak posters' emails. The autonomous runner gets the email straight
+    // from the request body, so storage was never load-bearing.
+    void clientEmail;
     const db = getServiceClient();
     await db.from("jobs").insert({
       chain_job_id: chainJobId,
@@ -36,7 +41,6 @@ export async function POST(req: NextRequest) {
       category: category ?? "General",
       client_address: clientAddress,
       provider_address: providerAddress,
-      client_email: clientEmail ?? null,
       agent: agent ?? null,
     });
 

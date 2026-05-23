@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { keccak256, toBytes, parseUnits } from "viem";
+import { keccak256, toBytes } from "viem";
 import {
   publicClient,
   getWalletClient,
   getSignerFromEnv,
-  getFaucetWalletClient,
 } from "@/lib/viem";
 import { getServiceClient } from "@/lib/supabase";
 import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI } from "@/contracts/abis";
 import {
   agentByWallet,
-  AGENT_WALLETS,
   AGENTS,
   GLOBAL_RULES,
   BUILD_SKILL,
@@ -36,10 +34,60 @@ type Job = {
 
 const reason = (s: string) => keccak256(toBytes(s.slice(0, 200)));
 
+// Reject URLs that point at internal/private/cloud-metadata services so a
+// brief cannot be used to coerce the function into fetching IMDS or
+// neighbouring containers. We only allow public http/https hostnames; IP
+// literals in private/loopback/link-local ranges and *.internal / *.local
+// hostnames are blocked. No DNS rebinding protection here; for testnet
+// audit this is acceptable, document for prod.
+function isSafeUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  const host = u.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host === "metadata.google.internal" ||
+    host === "instance-data"
+  ) {
+    return false;
+  }
+  // Block IPv4 literals in private / loopback / link-local / multicast ranges.
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const o = v4.slice(1).map(Number);
+    if (o.some((n) => n > 255)) return false;
+    const [a, b] = o;
+    if (a === 10) return false;
+    if (a === 127) return false;
+    if (a === 0) return false;
+    if (a === 169 && b === 254) return false; // link-local incl IMDS
+    if (a === 192 && b === 168) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a >= 224) return false; // multicast + reserved
+    return true;
+  }
+  // Block obvious IPv6 internals; full parsing isn't worth it for testnet.
+  if (host.startsWith("[")) {
+    const inner = host.slice(1, -1);
+    if (inner === "::1") return false;
+    if (inner.startsWith("fc") || inner.startsWith("fd")) return false; // ULA
+    if (inner.startsWith("fe80")) return false; // link-local
+  }
+  return true;
+}
+
 async function fetchTarget(desc: string): Promise<string> {
   const m = desc.match(/https?:\/\/[^\s)]+/i);
   if (!m) return "";
   let url = m[0];
+  if (!isSafeUrl(url)) return "";
   try {
     const gh = url.match(
       /github\.com\/([^/\s]+)\/([^/\s#]+)/i
@@ -49,6 +97,7 @@ async function fetchTarget(desc: string): Promise<string> {
         /\.git$/,
         ""
       )}/readme`;
+      if (!isSafeUrl(url)) return "";
       const r = await fetch(url, {
         headers: { Accept: "application/vnd.github.raw" },
       });
@@ -253,34 +302,11 @@ export async function POST(req: NextRequest) {
       await publicClient.waitForTransactionReceipt({ hash: settleHash });
     }
 
-    // 6b) Payout. If the job was client-funded (budget > 0), complete()
-    // already released the escrowed USDC to the agent on-chain, so the pool
-    // must NOT pay again. The pool only covers legacy/no-escrow jobs
-    // (budget == 0) where the client did not lock funds.
-    let payoutTx: string | null = null;
-    const amt = Number(amountUsdc ?? "0");
-    if (
-      evaluated &&
-      decision === "approve" &&
-      amt > 0 &&
-      job.budget === 0n
-    ) {
-      try {
-        const pool = getFaucetWalletClient();
-        const bal = await publicClient.getBalance({
-          address: pool.account.address,
-        });
-        const value = parseUnits(String(amt), 18);
-        if (bal >= value) {
-          payoutTx = await pool.sendTransaction({
-            to: AGENT_WALLETS[agent.id] as `0x${string}`,
-            value,
-          });
-        }
-      } catch {
-        /* payout best-effort; on-chain lifecycle already settled */
-      }
-    }
+    // 6b) Payout. Real client-funded escrow (budget > 0) releases
+    // automatically via complete(). The legacy pool fallback was removed
+    // because amountUsdc came from the request body, letting a third
+    // party drain the pool wallet by spamming runs for arbitrary amounts.
+    const payoutTx: string | null = null;
 
     // 7) Notify the poster (in-app always; email best-effort). Three
     // outcomes: completed, rejected, or submitted-pending-review.
@@ -296,9 +322,12 @@ export async function POST(req: NextRequest) {
         ? `Job #${jobId} was rejected on review by ${agent.name}. USDC refunded.`
         : `Job #${jobId}: ${agent.name} submitted the work. Automated review did not finish in time, so it is awaiting evaluation on the job page. No funds were moved.`;
     try {
+      // client_email is intentionally NOT stored here. The notifications
+      // table has a public read policy, so any column we put on it leaks
+      // via the Supabase anon endpoint. Email delivery happens directly
+      // from the request body (clientEmail), not from a stored copy.
       await db.from("notifications").insert({
         client_address: job.client.toLowerCase(),
-        client_email: clientEmail ?? null,
         chain_job_id: jobId,
         kind: outcome === "completed" ? "completed" : outcome === "rejected" ? "rejected" : "submitted",
         message: msg,
