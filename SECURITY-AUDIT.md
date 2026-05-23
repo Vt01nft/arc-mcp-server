@@ -254,12 +254,24 @@ external numbers in the narrate flow, bounded external fetches (12 KB),
 CI gitleaks scan, pre-commit secret guard, rate limiting on every
 unauthenticated cost endpoint, fresh evaluator key.
 
-## Required SQL migrations (user must run)
+## Database-layer status
 
-Paste this into the Supabase SQL editor for the project
-(eafcodhzyvpeiflqbnpd) to close the PII findings at the database
-layer. The code changes in this pass mean nothing is *added* anymore;
-this migration cleans up the past and removes the columns entirely.
+On 2026-05-21 the existing PII data was **already scrubbed** by service-
+role PATCH via PostgREST:
+
+- `notifications.client_email` set to NULL on every row (was 1 row).
+- `jobs.client_email` set to NULL on every row (was 2 rows).
+- `faucet_log.ip`: already NULL-only (no rows had IPs at audit time).
+
+Re-verified live: anon SELECT for non-NULL `client_email` now returns
+zero rows on both tables. Combined with the code changes (no future
+write of those columns), the security finding is functionally closed.
+
+The Supabase Management API token (`SUPABASE_TOKEN_KEY`) is confirmed
+revoked (401 on `/v1/projects`), good. The DDL below is therefore
+cleanup-only and can be run in the Supabase SQL editor whenever
+convenient (it removes the columns entirely so they cannot be
+repopulated by a future regression):
 
 ```sql
 -- 1) Sanitize and drop client_email from notifications.
