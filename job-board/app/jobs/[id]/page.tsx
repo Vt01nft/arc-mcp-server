@@ -12,6 +12,7 @@ import { ERC8183_ABI, USDC_ABI } from "@/contracts/abis";
 import { publicClient } from "@/lib/viem";
 import { agentByWallet } from "@/lib/agents";
 import type { EvaluateResponse } from "@/lib/types";
+import { buildZip } from "@/lib/zip";
 
 type JobData = {
   chain: {
@@ -71,6 +72,202 @@ function cleanDeliverable(raw: string): string {
   return c.replace(/^```[a-zA-Z0-9]*[ \t]*$/gm, "").trim();
 }
 
+// Phase C: agent runs now persist a small JSON pointer in content_preview
+// when the deliverable is a multi-file bundle. The file bytes live in
+// Supabase Storage at the public URLs. Returns null for legacy single-file
+// rows (raw HTML/markdown content_preview).
+type BundleManifest = {
+  v: 1;
+  bundle: true;
+  entry: string;
+  files: string[];
+  size?: number;
+};
+function tryParseBundleManifest(raw: string): BundleManifest | null {
+  const t = raw.trim();
+  if (!t.startsWith("{")) return null;
+  try {
+    const m = JSON.parse(t) as Partial<BundleManifest>;
+    if (
+      m &&
+      m.v === 1 &&
+      m.bundle === true &&
+      typeof m.entry === "string" &&
+      Array.isArray(m.files) &&
+      m.files.every((p) => typeof p === "string")
+    ) {
+      return m as BundleManifest;
+    }
+  } catch {
+    /* legacy raw content */
+  }
+  return null;
+}
+
+function bundleFileUrl(jobId: number, path: string): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  return `${base}/storage/v1/object/public/deliverables/${jobId}/${path}`;
+}
+
+function BundleView({
+  jobId,
+  manifest,
+  submittedAt,
+}: {
+  jobId: number;
+  manifest: BundleManifest;
+  submittedAt: string;
+}) {
+  const [zipping, setZipping] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const entryUrl = bundleFileUrl(jobId, manifest.entry);
+  const entryIsHtml = /\.html?$/i.test(manifest.entry);
+
+  async function downloadZip() {
+    setErr(null);
+    setZipping(true);
+    try {
+      const entries = await Promise.all(
+        manifest.files.map(async (p) => {
+          const r = await fetch(bundleFileUrl(jobId, p));
+          if (!r.ok) throw new Error(`fetch ${p}: ${r.status}`);
+          const buf = new Uint8Array(await r.arrayBuffer());
+          return { path: p, data: buf };
+        })
+      );
+      const zip = buildZip(entries);
+      const blob = new Blob([new Uint8Array(zip)], {
+        type: "application/zip",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `deliverable-job-${jobId}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setZipping(false);
+    }
+  }
+
+  return (
+    <div className="paper-card-soft">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <h2 className="eyebrow accent" style={{ margin: 0 }}>
+          Submitted Deliverable ({manifest.files.length} file
+          {manifest.files.length === 1 ? "" : "s"})
+        </h2>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a
+            className="btn btn-ghost"
+            style={{ height: 34, padding: "0 12px", fontSize: 12 }}
+            href={entryUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open entry
+          </a>
+          <button
+            className="btn btn-primary"
+            style={{ height: 34, padding: "0 12px", fontSize: 12 }}
+            disabled={zipping}
+            onClick={downloadZip}
+          >
+            {zipping ? "Zipping…" : "Download .zip"}
+          </button>
+        </div>
+      </div>
+
+      {entryIsHtml ? (
+        <iframe
+          title={`Deliverable preview for job ${jobId}`}
+          src={entryUrl}
+          // No allow-same-origin: the iframe runs in an opaque origin so the
+          // deliverable cannot read cookies, localStorage, or the parent.
+          sandbox="allow-scripts"
+          style={{
+            width: "100%",
+            height: 480,
+            border: "1px solid var(--rule)",
+            background: "#fff",
+            borderRadius: 0,
+          }}
+        />
+      ) : (
+        <p style={{ fontSize: 14, color: "var(--ink-2)", margin: 0 }}>
+          Entry file <span className="mono">{manifest.entry}</span> is not
+          HTML. Use Open entry to view it, or Download .zip for the full
+          bundle.
+        </p>
+      )}
+
+      <details style={{ marginTop: 14 }}>
+        <summary
+          className="eyebrow"
+          style={{ cursor: "pointer", textTransform: "none", letterSpacing: 0 }}
+        >
+          Files in this bundle
+        </summary>
+        <ul
+          className="mono"
+          style={{
+            fontSize: 12,
+            color: "var(--ink-2)",
+            margin: "10px 0 0",
+            paddingLeft: 16,
+            lineHeight: 1.7,
+          }}
+        >
+          {manifest.files.map((p) => (
+            <li key={p}>
+              <a
+                href={bundleFileUrl(jobId, p)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-underline"
+              >
+                {p}
+                {p === manifest.entry ? "  (entry)" : ""}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </details>
+
+      {err && (
+        <p
+          className="eyebrow"
+          style={{
+            marginTop: 10,
+            textTransform: "none",
+            letterSpacing: 0,
+            color: "var(--danger, #a33)",
+          }}
+        >
+          {err}
+        </p>
+      )}
+      <p
+        className="eyebrow"
+        style={{ marginTop: 10, textTransform: "none", letterSpacing: 0 }}
+      >
+        Submitted {new Date(submittedAt).toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
 // Renders the agent's deliverable: live sandboxed preview for single-file
 // HTML, readable source for everything else, plus a one-click download.
 function DeliverableView({
@@ -84,7 +281,18 @@ function DeliverableView({
     submitted_at: string;
   };
 }) {
-  const content = cleanDeliverable(deliverable.content_preview ?? "");
+  const raw = deliverable.content_preview ?? "";
+  const manifest = tryParseBundleManifest(raw);
+  if (manifest) {
+    return (
+      <BundleView
+        jobId={jobId}
+        manifest={manifest}
+        submittedAt={deliverable.submitted_at}
+      />
+    );
+  }
+  const content = cleanDeliverable(raw);
   const isHtml = content.length > 0 && looksLikeHtml(content);
   const [showSource, setShowSource] = useState(!isHtml);
   const [copied, setCopied] = useState(false);
@@ -201,8 +409,7 @@ function DeliverableView({
           className="eyebrow"
           style={{ marginTop: 10, textTransform: "none", letterSpacing: 0 }}
         >
-          Preview is truncated to the stored excerpt. Large multi-file output
-          is hosted in a later phase.
+          Preview is truncated to the stored excerpt.
         </p>
       )}
       {deliverable.ipfs_cid && (

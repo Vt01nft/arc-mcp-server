@@ -17,6 +17,8 @@ import {
 } from "@/lib/agents";
 import { callAgent, resilientJSON } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
+import { parseBundle } from "@/lib/bundle";
+import { clearBundle, uploadBundleFile } from "@/lib/storage";
 
 export const maxDuration = 300;
 
@@ -210,17 +212,37 @@ export async function POST(req: NextRequest) {
 
     const db = getServiceClient();
 
-    // 3) Submit on-chain from the agent's own wallet.
+    // 3) Phase C: parse the agent output into a sanitized multi-file bundle,
+    //    upload every file to Supabase Storage, and submit the canonical
+    //    manifest hash on-chain. Single-file outputs still parse into a
+    //    one-file bundle, so the same code path covers both shapes.
+    const bundle = parseBundle(deliverable);
+    await clearBundle(jobId); // wipe any prior bundle on re-submit
+    await Promise.all(
+      bundle.files.map((f) => uploadBundleFile(jobId, f.path, f.content))
+    );
+
+    // 4) Submit on-chain from the agent's own wallet, committing to the
+    //    canonical manifest hash (recomputable from the public storage URLs).
     const signer = getSignerFromEnv(agent.pkEnv);
     const submitHash = await signer.writeContract({
       address: ADDRESSES.ERC8183_JOB,
       abi: ERC8183_ABI,
       functionName: "submit",
-      args: [BigInt(jobId), keccak256(toBytes(deliverable)), "0x"],
+      args: [BigInt(jobId), bundle.hash, "0x"],
     });
     await publicClient.waitForTransactionReceipt({ hash: submitHash });
 
-    // 4) Persist the readable deliverable.
+    // 5) Persist a compact manifest pointer in `content_preview` so the job
+    //    page can detect a bundle without a schema change. File contents
+    //    themselves live in Storage at the public URLs.
+    const manifestPointer = JSON.stringify({
+      v: 1,
+      bundle: true,
+      entry: bundle.entry,
+      files: bundle.files.map((f) => f.path),
+      size: bundle.size,
+    });
     const { data: jobRow } = await db
       .from("jobs")
       .select("id")
@@ -231,13 +253,13 @@ export async function POST(req: NextRequest) {
       await db.from("deliverables").insert({
         job_id: jobRow.id,
         chain_job_id: jobId,
-        deliverable_hash: keccak256(toBytes(deliverable)),
-        content_preview: deliverable.slice(0, 200000),
+        deliverable_hash: bundle.hash,
+        content_preview: manifestPointer,
         ipfs_cid: null,
       });
     }
 
-    // 5) Gemini evaluation (advisory).
+    // 6) Gemini evaluation (advisory).
     let decision: "approve" | "reject" = "reject";
     let evaluated = false;
     let reasoningText = "Evaluator could not assess the deliverable.";
@@ -277,7 +299,7 @@ export async function POST(req: NextRequest) {
       /* default reject if evaluation fails */
     }
 
-    // 6) Evaluator wallet settles on-chain ONLY when the evaluator actually
+    // 7) Evaluator wallet settles on-chain ONLY when the evaluator actually
     // produced a decision. If evaluation could not run (timeout/outage), the
     // work was still submitted on-chain, so leave the job Submitted for a
     // human to review on the job page rather than auto-rejecting and
@@ -302,13 +324,13 @@ export async function POST(req: NextRequest) {
       await publicClient.waitForTransactionReceipt({ hash: settleHash });
     }
 
-    // 6b) Payout. Real client-funded escrow (budget > 0) releases
+    // 7b) Payout. Real client-funded escrow (budget > 0) releases
     // automatically via complete(). The legacy pool fallback was removed
     // because amountUsdc came from the request body, letting a third
     // party drain the pool wallet by spamming runs for arbitrary amounts.
     const payoutTx: string | null = null;
 
-    // 7) Notify the poster (in-app always; email best-effort). Three
+    // 8) Notify the poster (in-app always; email best-effort). Three
     // outcomes: completed, rejected, or submitted-pending-review.
     const outcome = !evaluated
       ? "pending"
