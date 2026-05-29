@@ -42,6 +42,9 @@ export function Header() {
           >
             Explorer
           </a>
+          <Link className="mast-link" href="/evaluators">
+            Evaluators
+          </Link>
           <Link className="mast-link" href="/analytics">
             Analytics
           </Link>

@@ -344,6 +344,211 @@ export const ERC8004_VALIDATION_ABI = [
   },
 ] as const;
 
+// ─── v2 Sprint 2: EvaluatorRegistry ───────────────────────────────────────────
+// Source: multi-evaluator/src/EvaluatorRegistry.sol (deployed by the server wallet).
+// Stake is native USDC (18 decimals). MIN_STAKE = 10 USDC.
+export const EVALUATOR_REGISTRY_ABI = [
+  // ── Write ──
+  {
+    // Stake >= MIN_STAKE native USDC (sent as msg.value) to join the jury pool.
+    name: "register",
+    type: "function",
+    stateMutability: "payable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: "deregister",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+  // ── Read ──
+  {
+    name: "activeCount",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "count", type: "uint256" }],
+  },
+  {
+    name: "evaluatorList",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    name: "evaluators",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "address" }],
+    outputs: [
+      { name: "stake", type: "uint256" },
+      { name: "totalVotes", type: "uint256" },
+      { name: "correctVotes", type: "uint256" },
+      { name: "active", type: "bool" },
+    ],
+  },
+  {
+    name: "getStake",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "evaluator", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "getAccuracy",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "evaluator", type: "address" }],
+    outputs: [
+      { name: "numerator", type: "uint256" },
+      { name: "denominator", type: "uint256" },
+    ],
+  },
+  {
+    name: "isActive",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "evaluator", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    name: "lockedUntil",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "MIN_STAKE",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  // ── Events ──
+  {
+    name: "Registered",
+    type: "event",
+    inputs: [
+      { name: "evaluator", type: "address", indexed: true },
+      { name: "stake", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
+
+// ─── v2 Sprint 2: MultiEvaluatorHook ───────────────────────────────────────────
+// Source: multi-evaluator/src/MultiEvaluatorHook.sol. 3-juror, 2-of-3 jury.
+// onDeliverableSubmitted is authorizedCaller-only (the server wallet seats juries).
+export const MULTI_EVALUATOR_HOOK_ABI = [
+  // ── Write ──
+  {
+    // authorizedCaller only. Seats a 3-juror jury for the job. amount is the
+    // job's escrowed value in native USDC (18 decimals) for fee math.
+    name: "onDeliverableSubmitted",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "jobId", type: "uint256" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    // Called by an assigned juror with their own wallet.
+    name: "castVote",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "jobId", type: "uint256" },
+      { name: "approve", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "forceResolve",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "jobId", type: "uint256" }],
+    outputs: [],
+  },
+  // ── Read ──
+  {
+    name: "getJury",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "jobId", type: "uint256" }],
+    outputs: [
+      { name: "members", type: "address[3]" },
+      { name: "votes", type: "uint8[3]" }, // 0=Pending 1=Approve 2=Reject
+      { name: "deadline", type: "uint256" },
+      { name: "resolved", type: "bool" },
+      { name: "approves", type: "uint8" },
+      { name: "rejects", type: "uint8" },
+    ],
+  },
+  {
+    name: "getVoteStatus",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "jobId", type: "uint256" }],
+    outputs: [
+      { name: "approves", type: "uint8" },
+      { name: "rejects", type: "uint8" },
+      { name: "pending", type: "uint8" },
+      { name: "canResolve", type: "bool" },
+    ],
+  },
+  {
+    name: "authorizedCaller",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  // ── Events ──
+  {
+    name: "JuryAssigned",
+    type: "event",
+    inputs: [
+      { name: "jobId", type: "uint256", indexed: true },
+      { name: "jurors", type: "address[3]", indexed: false },
+      { name: "deadline", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    name: "VoteCast",
+    type: "event",
+    inputs: [
+      { name: "jobId", type: "uint256", indexed: true },
+      { name: "juror", type: "address", indexed: true },
+      { name: "vote", type: "uint8", indexed: false },
+      { name: "approves", type: "uint8", indexed: false },
+      { name: "rejects", type: "uint8", indexed: false },
+    ],
+  },
+  {
+    name: "JuryResolved",
+    type: "event",
+    inputs: [
+      { name: "jobId", type: "uint256", indexed: true },
+      { name: "approved", type: "bool", indexed: false },
+      { name: "approves", type: "uint8", indexed: false },
+      { name: "rejects", type: "uint8", indexed: false },
+    ],
+  },
+] as const;
+
+// Jury vote enum (MultiEvaluatorHook.Vote)
+export const JURY_VOTE: Record<number, string> = {
+  0: "Pending",
+  1: "Approve",
+  2: "Reject",
+};
+
 // Job status enum for human-readable output
 export const JOB_STATUS: Record<number, string> = {
   0: "Open",

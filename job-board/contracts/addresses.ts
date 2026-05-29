@@ -31,6 +31,16 @@ export const ADDRESSES = {
   // ERC-8004: Agent validation registry
   // source: https://docs.arc.network/arc/tutorials/register-your-first-ai-agent
   ERC8004_VALIDATION: "0x8004Cb1BF31DAf7788923b405b754f57acEB4272" as `0x${string}`,
+
+  // ── Phase 3 / v2 Sprint 2: Multi-evaluator jury ──────────────────────────
+  // Deployed from multi-evaluator/script/Deploy.s.sol by the rotated server
+  // wallet (PRIVATE_KEY = NEXT_PUBLIC_EVALUATOR_ADDRESS). That wallet is the
+  // hook's owner + authorizedCaller AND the ERC-8183 evaluator on jury jobs,
+  // so the server seats juries and bridges the outcome to ERC-8183 without
+  // depending on the old (rotated-away) deployer key.
+  EVALUATOR_REGISTRY: "0x49fD54E3713CFa32f7A041E3d328FfB0380dd3A6" as `0x${string}`,
+  MULTI_EVALUATOR_HOOK: "0x876E0cC973B36946CAb30Bd01d4F9C1cC0847D38" as `0x${string}`,
+  VOTE_ESCROW: "0xECD11530Ec3d975C69eC6886f3b6641282B63D3b" as `0x${string}`,
 } as const;
 
 // USDC has dual decimal system on Arc:
