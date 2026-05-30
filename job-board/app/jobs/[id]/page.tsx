@@ -471,6 +471,11 @@ export default function JobDetailPage() {
   const [budgetInput, setBudgetInput] = useState("");
   const [funding, setFunding] = useState(false);
   const [escrowErr, setEscrowErr] = useState<string | null>(null);
+  // Live jury hint: the AgenticCommerce hook field is whitelisted (zeroAddress
+  // for our jobs), so we can't tell from the on-chain job alone whether a
+  // jury is involved. Poll the off-chain jury read instead — once the runner
+  // seats the jury, the panel lights up.
+  const [juryAssigned, setJuryAssigned] = useState(false);
 
   // `loading` is derived: true until the fetch for the current `id` resolves.
   // When `id` changes, loadedId is stale so this flips back to true on render,
@@ -506,6 +511,29 @@ export default function JobDetailPage() {
       /* keep current state on transient failure */
     }
   }, [id]);
+
+  // Poll the jury hook for this jobId. Cheap RPC read; once assigned the
+  // panel renders. Slows to 30s once the jury is resolved.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/jury/${id}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!cancelled) setJuryAssigned(!!j.assigned);
+      } catch {
+        /* tolerate transient RPC */
+      }
+    };
+    tick();
+    const t = setInterval(tick, juryAssigned ? 30_000 : 7_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [id, juryAssigned]);
 
   // While an autonomous agent job is mid-flight, poll until it settles so the
   // poster watches it complete without manually refreshing.
@@ -823,6 +851,46 @@ export default function JobDetailPage() {
           {chain.status === 5 && "Expired. The client can claim a refund."}
         </p>
       </div>
+
+      {/* Jury settlement panel — visible whenever the off-chain hook has a
+          jury seated for this jobId (set by the runner after submit when
+          useJury was passed). Independent of the ERC-8183 hook field. */}
+      {juryAssigned && (
+        <div
+          className="paper-card-soft"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            borderLeft: "3px solid var(--accent)",
+          }}
+        >
+          <div className="eyebrow accent">Settled by 3-juror jury</div>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+            This job routes through the MultiEvaluatorHook. Three jurors are
+            drawn from the staked <Link href="/evaluators" className="mast-link">pool</Link>,
+            evaluate independently (Gemini, GPT-4o-mini, Claude), and vote
+            on-chain. 2-of-3 settles; the server bridges the outcome to the
+            ERC-8183 escrow.
+          </p>
+          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+            <Link
+              href={`/jury/${chain.id}`}
+              className="btn btn-primary"
+              style={{ height: 36, padding: "0 14px", fontSize: 13 }}
+            >
+              Live Jury State
+            </Link>
+            <Link
+              href="/evaluators"
+              className="btn btn-ghost"
+              style={{ height: 36, padding: "0 14px", fontSize: 13 }}
+            >
+              Evaluator Pool
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Provider sets the budget (price) while the job is Open */}
       {isOpen && isProvider && budgetRaw === 0n && (

@@ -19,6 +19,15 @@ import { callAgent, resilientJSON } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
 import { parseBundle } from "@/lib/bundle";
 import { clearBundle, uploadBundleFile } from "@/lib/storage";
+import {
+  isJuryHook,
+  seatJuryFor,
+  jurorEvaluate,
+  castVoteSafe,
+  bridgeToErc8183,
+  getJury,
+  JUROR_SLOTS,
+} from "@/lib/jury";
 
 export const maxDuration = 300;
 
@@ -117,10 +126,11 @@ export async function POST(req: NextRequest) {
   const limited = rateLimit(req, "agent-run", 12, 60_000);
   if (limited) return limited;
   try {
-    const { jobId, clientEmail, amountUsdc } = (await req.json()) as {
+    const { jobId, clientEmail, amountUsdc, useJury } = (await req.json()) as {
       jobId?: number;
       clientEmail?: string;
       amountUsdc?: string;
+      useJury?: boolean;
     };
     if (jobId == null || !Number.isInteger(jobId)) {
       return NextResponse.json({ error: "jobId required" }, { status: 400 });
@@ -259,69 +269,163 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 6) Gemini evaluation (advisory).
+    // 6) Evaluation + settlement. Two paths:
+    //    (a) jury path — job.hook == MULTI_EVALUATOR_HOOK: seat 3-juror jury,
+    //        each juror evaluates independently with a different model, three
+    //        votes are cast on-chain from EVALUATOR_PK_1/2/3, then the server
+    //        bridges the 2-of-3 outcome to ERC-8183 complete/reject.
+    //    (b) single-evaluator path — the legacy auto-loop (unchanged).
     let decision: "approve" | "reject" = "reject";
     let evaluated = false;
     let reasoningText = "Evaluator could not assess the deliverable.";
-    try {
-      const er = await resilientJSON(
-        `You are the evaluator. Decide if the deliverable satisfies the brief. Strict but fair. JSON {"decision":"approve"|"reject","reasoning":"2-4 sentences","confidence":0..1}.\nBrief:\n${job.description.slice(
-          0,
-          2500
-        )}\nDeliverable:\n${deliverable.slice(0, 120000)}`,
-        3072,
-        1024
-      );
-      const e = JSON.parse(er.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as {
-        decision?: string;
-        reasoning?: string;
-        confidence?: number;
-      };
-      if (e.decision === "approve" || e.decision === "reject") {
-        decision = e.decision;
-        evaluated = true;
-      }
-      reasoningText = (e.reasoning ?? reasoningText).slice(0, 1000);
-      if (jobRow) {
-        await db.from("evaluations").insert({
-          job_id: jobRow.id,
-          chain_job_id: jobId,
-          decision,
-          reasoning: reasoningText,
-          confidence:
-            typeof e.confidence === "number"
-              ? Math.min(1, Math.max(0, e.confidence))
-              : 0,
-          evaluator: "gemini-2.5-flash",
-        });
-      }
-    } catch {
-      /* default reject if evaluation fails */
-    }
-
-    // 7) Evaluator wallet settles on-chain ONLY when the evaluator actually
-    // produced a decision. If evaluation could not run (timeout/outage), the
-    // work was still submitted on-chain, so leave the job Submitted for a
-    // human to review on the job page rather than auto-rejecting and
-    // refunding away completed work.
     let settleHash: `0x${string}` | null = null;
-    if (evaluated) {
-      const evalWallet = getWalletClient();
-      settleHash = await evalWallet.writeContract({
-        address: ADDRESSES.ERC8183_JOB,
-        abi: ERC8183_ABI,
-        functionName: decision === "approve" ? "complete" : "reject",
-        args: [
-          BigInt(jobId),
-          reason(
-            decision === "approve"
-              ? "agent work approved"
-              : "did not pass review"
-          ),
-          "0x",
-        ],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: settleHash });
+    let juryInfo: {
+      seatTx: string;
+      voteTxs: (string | null)[];
+      voteSkips: (string | undefined)[];
+      verdicts: { slot: number; model: string; approve: boolean; confidence: number }[];
+      resolved: boolean;
+      approves: number;
+      rejects: number;
+    } | null = null;
+
+    // Jury path triggers off two signals: an explicit useJury flag in the
+    // POST body (the /post checkbox path), or the hook field on the job
+    // pointing at MULTI_EVALUATOR_HOOK (only possible if Arc later whitelists
+    // it; today the AgenticCommerce hook whitelist rejects ours, so the body
+    // flag is the practical trigger).
+    if (useJury === true || isJuryHook(job.hook)) {
+      // (a) JURY PATH
+      try {
+        const seatTx = await seatJuryFor(BigInt(jobId), job.budget);
+        const verdicts = await Promise.all(
+          JUROR_SLOTS.map((slot) =>
+            jurorEvaluate(slot, job.description, deliverable)
+          )
+        );
+        // Cast votes sequentially so we don't race the on-chain _resolve
+        // trigger. castVoteSafe swallows idempotent reverts after _resolve.
+        const voteTxs: (`0x${string}` | null)[] = [];
+        const voteSkips: (string | undefined)[] = [];
+        for (const v of verdicts) {
+          const r = await castVoteSafe(v.slot, BigInt(jobId), v.approve);
+          voteTxs.push(r.tx);
+          voteSkips.push(r.skipped);
+        }
+        const finalJury = await getJury(BigInt(jobId));
+        const approved = finalJury.approves > finalJury.rejects;
+        decision = approved ? "approve" : "reject";
+        evaluated = finalJury.resolved;
+        reasoningText = `Jury ${approved ? "approved" : "rejected"} ${
+          approved ? finalJury.approves : finalJury.rejects
+        }-${approved ? finalJury.rejects : finalJury.approves}: ${
+          verdicts.map((v) => `${v.modelLabel.split(":").pop()}=${v.approve ? "Y" : "N"}`).join(", ")
+        }`;
+
+        if (finalJury.resolved && jobRow) {
+          // Persist one row per juror so the job page can show real diversity.
+          await Promise.all(
+            verdicts.map((v) =>
+              db.from("evaluations").insert({
+                job_id: jobRow.id,
+                chain_job_id: jobId,
+                decision: v.approve ? "approve" : "reject",
+                reasoning: v.reasoning,
+                confidence: v.confidence,
+                evaluator: `jury#${v.slot} ${v.modelLabel}`,
+              })
+            )
+          );
+        }
+
+        if (finalJury.resolved) {
+          const bridged = await bridgeToErc8183(
+            BigInt(jobId),
+            approved,
+            reasoningText
+          );
+          settleHash = bridged.tx;
+        }
+
+        juryInfo = {
+          seatTx,
+          voteTxs,
+          voteSkips,
+          verdicts: verdicts.map((v) => ({
+            slot: v.slot,
+            model: v.modelLabel,
+            approve: v.approve,
+            confidence: v.confidence,
+          })),
+          resolved: finalJury.resolved,
+          approves: finalJury.approves,
+          rejects: finalJury.rejects,
+        };
+      } catch (e) {
+        // Jury orchestration failed mid-flight. The deliverable is already
+        // on-chain; /jury/[jobId] + /api/jury/{seat,vote,bridge} can finish
+        // the job manually, so don't auto-reject or refund here.
+        console.error("jury orchestration error:", (e as Error).message);
+      }
+    } else {
+      // (b) SINGLE-EVALUATOR PATH (legacy auto-loop, unchanged behavior)
+      try {
+        const er = await resilientJSON(
+          `You are the evaluator. Decide if the deliverable satisfies the brief. Strict but fair. JSON {"decision":"approve"|"reject","reasoning":"2-4 sentences","confidence":0..1}.\nBrief:\n${job.description.slice(
+            0,
+            2500
+          )}\nDeliverable:\n${deliverable.slice(0, 120000)}`,
+          3072,
+          1024
+        );
+        const e = JSON.parse(er.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as {
+          decision?: string;
+          reasoning?: string;
+          confidence?: number;
+        };
+        if (e.decision === "approve" || e.decision === "reject") {
+          decision = e.decision;
+          evaluated = true;
+        }
+        reasoningText = (e.reasoning ?? reasoningText).slice(0, 1000);
+        if (jobRow) {
+          await db.from("evaluations").insert({
+            job_id: jobRow.id,
+            chain_job_id: jobId,
+            decision,
+            reasoning: reasoningText,
+            confidence:
+              typeof e.confidence === "number"
+                ? Math.min(1, Math.max(0, e.confidence))
+                : 0,
+            evaluator: "gemini-2.5-flash",
+          });
+        }
+      } catch {
+        /* default reject if evaluation fails */
+      }
+
+      // Evaluator wallet settles only when an explicit decision was produced.
+      // If evaluation could not run, leave the job Submitted for a human to
+      // review on the job page rather than refunding away completed work.
+      if (evaluated) {
+        const evalWallet = getWalletClient();
+        settleHash = await evalWallet.writeContract({
+          address: ADDRESSES.ERC8183_JOB,
+          abi: ERC8183_ABI,
+          functionName: decision === "approve" ? "complete" : "reject",
+          args: [
+            BigInt(jobId),
+            reason(
+              decision === "approve"
+                ? "agent work approved"
+                : "did not pass review"
+            ),
+            "0x",
+          ],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: settleHash });
+      }
     }
 
     // 7b) Payout. Real client-funded escrow (budget > 0) releases
@@ -393,6 +497,7 @@ export async function POST(req: NextRequest) {
       submitTx: submitHash,
       settleTx: settleHash,
       payoutTx,
+      jury: juryInfo,
     });
   } catch (err) {
     const m = err instanceof Error ? err.message : String(err);

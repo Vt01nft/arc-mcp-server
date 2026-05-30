@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { zeroAddress, decodeEventLog, parseUnits } from "viem";
 import { ERC8183_ABI, USDC_ABI } from "@/contracts/abis";
@@ -68,6 +69,7 @@ export default function PostJobPage() {
     expiryHours: 72,
     agent: "auto",
     email: "",
+    settleWithJury: false,
   });
   // Prefill the alert email with the Circle login email once it loads,
   // but let the user override it.
@@ -156,8 +158,9 @@ export default function PostJobPage() {
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target as HTMLInputElement;
+    const next = type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
+    setForm((prev) => ({ ...prev, [name]: next }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -226,6 +229,9 @@ export default function PostJobPage() {
 
         // 1) Create the job (one signature). Isolated so a Circle signing
         // failure is reported precisely and nothing downstream runs.
+        // NOTE: the deployed AgenticCommerce contract has a hook whitelist
+        // that rejects unknown hooks, so we always pass zeroAddress here.
+        // Jury routing is off-chain (carried via the runner POST below).
         try {
           await circle.execute({
             address: ADDRESSES.ERC8183_JOB,
@@ -350,6 +356,7 @@ export default function PostJobPage() {
               jobId,
               clientEmail: form.email || circle.email,
               amountUsdc: amount,
+              useJury: form.settleWithJury,
             }),
           }).catch(() => {});
         }
@@ -372,7 +379,7 @@ export default function PostJobPage() {
         EVALUATOR_ADDRESS,
         expiryTimestamp,
         form.description, // on-chain description is a string, not a hash
-        zeroAddress, // no hook (address(0) is whitelisted)
+        zeroAddress, // hook whitelist on Arc rejects ours; jury is off-chain
       ],
     });
   }
@@ -529,6 +536,35 @@ export default function PostJobPage() {
               automatically when the work is approved, and refunded to you if
               it is rejected. Leave it blank to post without escrow (the agent
               still does the work; no payout).
+            </p>
+          </div>
+
+          <div>
+            <label
+              className="label"
+              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+            >
+              <input
+                type="checkbox"
+                name="settleWithJury"
+                checked={form.settleWithJury}
+                onChange={handleChange}
+                style={{ width: 16, height: 16, accentColor: "var(--accent)" }}
+              />
+              Settle with jury (3 evaluators, 2-of-3 vote)
+            </label>
+            <p
+              className="eyebrow"
+              style={{ marginTop: 8, textTransform: "none", letterSpacing: 0 }}
+            >
+              Routes the deliverable through the MultiEvaluatorHook instead of
+              a single AI evaluator. Three jurors are drawn from the staked
+              pool, evaluate independently (Gemini, GPT-4o-mini, Claude), and
+              vote on-chain. The job page links to{" "}
+              <Link href="/evaluators" className="mast-link">/evaluators</Link>{" "}
+              for the pool and to <span className="mono">/jury/{"<id>"}</span>{" "}
+              for live tallies. Leave unchecked to keep the existing single-AI
+              auto-loop.
             </p>
           </div>
 
