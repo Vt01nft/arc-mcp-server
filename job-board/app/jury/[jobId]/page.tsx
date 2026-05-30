@@ -33,9 +33,6 @@ export default function JuryPage() {
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [bridging, setBridging] = useState(false);
-  const [bridgeMsg, setBridgeMsg] = useState<string | null>(null);
-
   const load = useCallback(async () => {
     if (!jobId) return;
     try {
@@ -61,30 +58,6 @@ export default function JuryPage() {
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(t);
   }, []);
-
-  async function bridge() {
-    setBridging(true);
-    setBridgeMsg(null);
-    try {
-      const res = await fetch("/api/jury/bridge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "bridge failed");
-      setBridgeMsg(
-        data.skipped
-          ? `already bridged (${data.skipped})`
-          : `Bridged to ERC-8183 ${data.approved ? "complete()" : "reject()"} tx ${short(data.tx)}`
-      );
-      load();
-    } catch (e) {
-      setBridgeMsg(e instanceof Error ? e.message : "bridge failed");
-    } finally {
-      setBridging(false);
-    }
-  }
 
   const countdown = jury ? jury.deadline - now : 0;
   const status: { label: string; cls: string } = !jury
@@ -237,24 +210,14 @@ export default function JuryPage() {
           <div className="eyebrow accent" style={{ marginBottom: 8 }}>
             Settlement
           </div>
-          <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--ink-2)" }}>
-            The jury has resolved on-chain. Bridge the outcome to the ERC-8183
-            job (server evaluator wallet calls complete or reject).
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ink-2)" }}>
+            The jury has resolved on-chain. The runner bridges the outcome to
+            the ERC-8183 job automatically; check the{" "}
+            <Link href={`/jobs/${jobId}`} className="mast-link">job page</Link>{" "}
+            for the final status. Manual recovery, if ever needed, runs
+            server-side from{" "}
+            <span className="mono">scripts/jury-bridge.mjs</span>.
           </p>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={bridge}
-            disabled={bridging}
-            style={{ height: 38, padding: "0 14px", fontSize: 13 }}
-          >
-            {bridging ? "Bridging…" : "Bridge to ERC-8183"}
-          </button>
-          {bridgeMsg && (
-            <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--ink-2)" }}>
-              {bridgeMsg}
-            </p>
-          )}
         </div>
       )}
     </div>

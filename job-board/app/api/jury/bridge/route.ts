@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/ratelimit";
+import { requireRunnerAuth } from "@/lib/auth-runner";
 import { bridgeToErc8183, getJury } from "@/lib/jury";
 
 // POST /api/jury/bridge { jobId }
 // Read jury outcome and call complete/reject on ERC-8183 from the server
-// evaluator wallet. Idempotent: skip if the job has already left Submitted.
+// evaluator wallet. REQUIRES x-runner-token. The outcome is deterministic
+// from on-chain votes so a hostile caller can't change it, but spamming
+// this endpoint would still burn server-wallet gas on every jury job and
+// front-run the runner's own bridge call.
 export async function POST(req: NextRequest) {
+  const unauth = requireRunnerAuth(req);
+  if (unauth) return unauth;
   const limited = rateLimit(req, "jury-bridge", 12, 60_000);
   if (limited) return limited;
   try {

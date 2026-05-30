@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/ratelimit";
+import { requireRunnerAuth } from "@/lib/auth-runner";
 import { castVoteSafe, getJury, JUROR_SLOTS, type JurorSlot } from "@/lib/jury";
 
 // POST /api/jury/vote { jobId, slot: 1|2|3, approve: boolean }
-// Server signs castVote with EVALUATOR_PK_<slot>. On-chain enforces
-// "Not a jury member" if the slot wasn't drawn for this job, so a hostile
-// caller cannot vote with a wallet that wasn't selected.
+// Server signs castVote with EVALUATOR_PK_<slot>. REQUIRES x-runner-token.
+// On-chain "Not a jury member" rules out wrong slots, but the slot wallets
+// ARE always members of their own juries, so an unauthenticated caller could
+// otherwise force any verdict (including reject) on any jury job before the
+// runner's diverse-AI verdicts even ran. The token closes that hole.
 export async function POST(req: NextRequest) {
+  const unauth = requireRunnerAuth(req);
+  if (unauth) return unauth;
   const limited = rateLimit(req, "jury-vote", 20, 60_000);
   if (limited) return limited;
   try {

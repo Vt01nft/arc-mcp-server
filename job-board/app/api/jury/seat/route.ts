@@ -3,15 +3,18 @@ import { publicClient } from "@/lib/viem";
 import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI } from "@/contracts/abis";
 import { rateLimit } from "@/lib/ratelimit";
+import { requireRunnerAuth } from "@/lib/auth-runner";
 import { getJury, isJuryHook, seatJuryFor } from "@/lib/jury";
 
 // POST /api/jury/seat { jobId }
 // Server calls hook.onDeliverableSubmitted to seat a 3-juror jury.
 // Idempotent: returns the existing jury if one is already assigned.
-// Authorization is enforced on-chain: only authorizedCaller (PRIVATE_KEY) can
-// seat, so a hostile caller hitting this route still produces a revert at
-// signing time. We still rate-limit to keep the RPC behaved.
+// REQUIRES x-runner-token. Without the gate, a hostile caller could repeatedly
+// trigger seatJuryFor — which in turn calls ensureHookFunded — and drain the
+// server wallet via the public hook top-up path.
 export async function POST(req: NextRequest) {
+  const unauth = requireRunnerAuth(req);
+  if (unauth) return unauth;
   const limited = rateLimit(req, "jury-seat", 12, 60_000);
   if (limited) return limited;
   try {
