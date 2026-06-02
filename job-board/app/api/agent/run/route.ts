@@ -17,6 +17,7 @@ import {
   SECURITY_AUDIT_SKILL,
 } from "@/lib/agents";
 import { giveAgentFeedback } from "@/lib/reputation";
+import { takeProtocolFee } from "@/lib/fee";
 import { callAgent, resilientJSON } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
 import { parseBundle } from "@/lib/bundle";
@@ -469,6 +470,26 @@ export async function POST(req: NextRequest) {
       if (fb.error) console.warn("ERC-8004 feedback failed:", fb.error);
     }
 
+    // 7d) Protocol fee. On an approved agent job with real escrow, complete()
+    // has released the full budget to this agent wallet. Skim the configured
+    // fee to the treasury. 0 bps on testnet => no-op, so the live loop is
+    // unchanged until the fee is flipped on for mainnet. Best-effort.
+    let feeTx: string | null = null;
+    if (
+      evaluated &&
+      settleHash &&
+      decision === "approve" &&
+      job.budget > 0n &&
+      amountUsdc &&
+      Number(amountUsdc) > 0
+    ) {
+      const fee = await takeProtocolFee({ agentPkEnv: agent.pkEnv, budgetUsdc: amountUsdc });
+      feeTx = fee.tx;
+      if (fee.tx) console.info(`protocol fee ${fee.feeUsdc} USDC -> treasury (${fee.tx})`);
+      else if (fee.skipped && !/disabled|not set/.test(fee.skipped))
+        console.warn("protocol fee skipped:", fee.skipped);
+    }
+
     // 8) Notify the poster (in-app always; email best-effort). Three
     // outcomes: completed, rejected, or submitted-pending-review.
     const outcome = !evaluated
@@ -533,6 +554,7 @@ export async function POST(req: NextRequest) {
       settleTx: settleHash,
       payoutTx,
       reputationTx,
+      feeTx,
       jury: juryInfo,
     });
   } catch (err) {

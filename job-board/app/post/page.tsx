@@ -537,6 +537,16 @@ export default function PostJobPage() {
               it is rejected. Leave it blank to post without escrow (the agent
               still does the work; no payout).
             </p>
+            <p
+              className="eyebrow"
+              style={{ marginTop: 6, textTransform: "none", letterSpacing: 0 }}
+            >
+              Low on Arc USDC?{" "}
+              <Link href="/cctp" className="mast-link">
+                Fund from Optimism
+              </Link>{" "}
+              with CCTP v2.
+            </p>
           </div>
 
           <div>

@@ -47,7 +47,24 @@ export const ADDRESSES = {
   EVALUATOR_REGISTRY: "0x49fD54E3713CFa32f7A041E3d328FfB0380dd3A6" as `0x${string}`,
   MULTI_EVALUATOR_HOOK: "0x876E0cC973B36946CAb30Bd01d4F9C1cC0847D38" as `0x${string}`,
   VOTE_ESCROW: "0xECD11530Ec3d975C69eC6886f3b6641282B63D3b" as `0x${string}`,
+
+  // ── v2 Sprint 3: CCTP v2 (cross-chain USDC) ──────────────────────────────
+  // VERIFIED on-chain: both have code on Arc, MessageTransmitter.localDomain
+  // == 26 (Arc). depositForBurn/receiveMessage sigs verified from arcscan
+  // impls (TokenMessenger impl 0xf07c0ad1..., Transmitter impl 0xa849059b...).
+  // Same addresses on Optimism Sepolia (domain 2). Source: Circle CCTP v2 docs.
+  CCTP_TOKEN_MESSENGER: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA" as `0x${string}`,
+  CCTP_MESSAGE_TRANSMITTER: "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275" as `0x${string}`,
 } as const;
+
+// CCTP v2 domain ids (NOT chain ids).
+export const CCTP_DOMAIN = {
+  ARC_TESTNET: 26,
+  OPTIMISM_SEPOLIA: 2,
+} as const;
+
+// Circle Iris attestation service (sandbox = testnet).
+export const CCTP_IRIS_SANDBOX = "https://iris-api-sandbox.circle.com";
 
 // USDC has dual decimal system on Arc:
 // - 18 decimals: native gas token (wei-level precision)

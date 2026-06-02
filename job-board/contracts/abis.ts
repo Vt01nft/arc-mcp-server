@@ -626,6 +626,42 @@ export const JURY_VOTE: Record<number, string> = {
   2: "Reject",
 };
 
+// ─── v2 Sprint 3: CCTP v2 ──────────────────────────────────────────────────────
+// Signatures VERIFIED from the arcscan impl ABIs.
+export const CCTP_TOKEN_MESSENGER_ABI = [
+  {
+    // Burn USDC on the source chain to mint it on the destination domain.
+    name: "depositForBurn",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "amount", type: "uint256" },
+      { name: "destinationDomain", type: "uint32" },
+      { name: "mintRecipient", type: "bytes32" }, // recipient address left-padded
+      { name: "burnToken", type: "address" },
+      { name: "destinationCaller", type: "bytes32" }, // 0 => anyone can mint
+      { name: "maxFee", type: "uint256" }, // CCTP v2 fast-transfer fee cap
+      { name: "minFinalityThreshold", type: "uint32" }, // 1000 = standard finality
+    ],
+    outputs: [],
+  },
+] as const;
+
+export const CCTP_MESSAGE_TRANSMITTER_ABI = [
+  {
+    // Mint on the destination chain using Circle's attestation. Permissionless
+    // unless the burn set a destinationCaller.
+    name: "receiveMessage",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "message", type: "bytes" },
+      { name: "attestation", type: "bytes" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
+
 // Job status enum for human-readable output
 export const JOB_STATUS: Record<number, string> = {
   0: "Open",
