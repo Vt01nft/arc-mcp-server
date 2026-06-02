@@ -137,8 +137,11 @@ export async function ensureHookFunded(): Promise<{ topped: boolean; balance: bi
 }
 
 export async function seatJuryFor(jobId: bigint, jobAmount: bigint): Promise<`0x${string}`> {
-  // The hook's _resolve sends a 5% reward to winners, so make sure it can pay.
-  await ensureHookFunded();
+  // NOTE: this does NOT auto-fund the hook. Funding is a privileged spend and
+  // must not be reachable from a request path (even the gated seat route), so
+  // it lives in the trusted in-process runner (ensureHookFunded, called before
+  // this) and in scripts/fund-hook.mjs for ops. The hook only needs balance to
+  // pay the 5% reward on budget>0 jobs; budget==0 jobs need none.
   const wallet = getWalletClient(); // PRIVATE_KEY == authorizedCaller
   const hash = await wallet.writeContract({
     address: HOOK,

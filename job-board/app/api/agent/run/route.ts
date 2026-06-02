@@ -25,6 +25,7 @@ import { clearBundle, uploadBundleFile } from "@/lib/storage";
 import {
   isJuryHook,
   seatJuryFor,
+  ensureHookFunded,
   jurorEvaluate,
   castVoteSafe,
   bridgeToErc8183,
@@ -301,6 +302,16 @@ export async function POST(req: NextRequest) {
     if (useJury === true || isJuryHook(job.hook)) {
       // (a) JURY PATH
       try {
+        // Self-heal the hook's reward balance here in the trusted in-process
+        // runner (NOT in seatJuryFor, so the gated /api/jury/seat route can
+        // never trigger a funded spend). Best-effort; budget==0 jobs need none.
+        if (job.budget > 0n) {
+          try {
+            await ensureHookFunded();
+          } catch (e) {
+            console.warn("ensureHookFunded failed (continuing):", (e as Error).message);
+          }
+        }
         const seatTx = await seatJuryFor(BigInt(jobId), job.budget);
         // selectJury draws 3 at random from the whole active pool, which may
         // now include human evaluators. Only vote for the slots WE own
