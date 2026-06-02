@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { JuryView } from "@/lib/jury";
+import { useCircle } from "@/components/CircleProvider";
+import { ADDRESSES } from "@/contracts/addresses";
+import { MULTI_EVALUATOR_HOOK_ABI } from "@/contracts/abis";
 
 const EXPLORER = "https://testnet.arcscan.app";
 const VOTE_LABEL: Record<number, string> = { 0: "Pending", 1: "Approve", 2: "Reject" };
@@ -29,10 +32,13 @@ export default function JuryPage() {
   const params = useParams();
   const jobId = String(params?.jobId ?? "");
 
+  const circle = useCircle();
   const [jury, setJury] = useState<JuryView | null>(null);
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [voting, setVoting] = useState(false);
+  const [voteMsg, setVoteMsg] = useState<string | null>(null);
   const load = useCallback(async () => {
     if (!jobId) return;
     try {
@@ -58,6 +64,42 @@ export default function JuryPage() {
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // A connected human juror can vote when their Circle wallet is one of the
+  // members, hasn't voted yet, and the jury is open within its window.
+  const myAddr = circle.address?.toLowerCase();
+  const myMemberIdx =
+    jury && myAddr ? jury.members.findIndex((m) => m.toLowerCase() === myAddr) : -1;
+  const canVote =
+    !!jury &&
+    jury.assigned &&
+    !jury.resolved &&
+    myMemberIdx >= 0 &&
+    jury.votes[myMemberIdx] === 0 &&
+    jury.deadline - now > 0;
+
+  async function castVote(approve: boolean) {
+    if (circle.status !== "ready") {
+      setVoteMsg("Sign in with Circle first (button in the header).");
+      return;
+    }
+    setVoting(true);
+    setVoteMsg(null);
+    try {
+      await circle.execute({
+        address: ADDRESSES.MULTI_EVALUATOR_HOOK,
+        abi: MULTI_EVALUATOR_HOOK_ABI,
+        functionName: "castVote",
+        args: [BigInt(jobId), approve],
+      });
+      setVoteMsg(`Vote recorded: ${approve ? "Approve" : "Reject"}.`);
+      load();
+    } catch (e) {
+      setVoteMsg(e instanceof Error ? e.message : "Vote failed.");
+    } finally {
+      setVoting(false);
+    }
+  }
 
   const countdown = jury ? jury.deadline - now : 0;
   const status: { label: string; cls: string } = !jury
@@ -204,6 +246,61 @@ export default function JuryPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Human juror voting — visible when the connected Circle wallet is an
+          unvoted member of this jury and the window is open. */}
+      {canVote && (
+        <div
+          className="paper-card"
+          style={{ marginBottom: 20, borderLeft: "3px solid var(--accent)" }}
+        >
+          <div className="eyebrow accent" style={{ marginBottom: 8 }}>
+            You are juror #{myMemberIdx + 1} — cast your vote
+          </div>
+          <p style={{ margin: "0 0 14px", fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+            Review the deliverable on the{" "}
+            <Link href={`/jobs/${jobId}`} className="mast-link">job page</Link>,
+            then vote. Voting with the majority earns a share of the 5% fee;
+            a minority vote is slashed. One PIN, signed with your Circle wallet.
+          </p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => castVote(true)}
+              disabled={voting}
+              style={{ height: 40, padding: "0 18px", fontSize: 13 }}
+            >
+              {voting ? "Signing…" : "Approve"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => castVote(false)}
+              disabled={voting}
+              style={{ height: 40, padding: "0 18px", fontSize: 13 }}
+            >
+              {voting ? "Signing…" : "Reject"}
+            </button>
+          </div>
+          {voteMsg && (
+            <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ink-2)" }}>
+              {voteMsg}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* A connected member who already voted sees a confirmation instead. */}
+      {jury?.assigned && myMemberIdx >= 0 && jury.votes[myMemberIdx] !== 0 && (
+        <div className="paper-card-soft" style={{ marginBottom: 20 }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ink-2)" }}>
+            You voted{" "}
+            <b>{jury.votes[myMemberIdx] === 1 ? "Approve" : "Reject"}</b> as juror
+            #{myMemberIdx + 1} on this job.
+          </p>
+        </div>
+      )}
 
       {jury?.resolved && (
         <div className="paper-card-soft" style={{ marginBottom: 20 }}>

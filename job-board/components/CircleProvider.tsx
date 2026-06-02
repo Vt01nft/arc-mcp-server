@@ -35,6 +35,10 @@ type CircleCtx = CircleState & {
     abi: readonly unknown[];
     functionName: string;
     args: readonly unknown[];
+    // Native USDC value to send with the call (decimal string, e.g. "10").
+    // Rare on Arc since USDC is the ERC-20 too, but required for payable fns
+    // like EvaluatorRegistry.register() that stake via msg.value.
+    amount?: string;
   }) => Promise<void>;
 };
 
@@ -185,7 +189,7 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const execute = useCallback<CircleCtx["execute"]>(
-    async ({ address: contractAddress, abi, functionName, args }) => {
+    async ({ address: contractAddress, abi, functionName, args, amount }) => {
       if (!session && !email) throw new Error("Sign in with Circle first");
 
       let appId = session?.appId ?? "";
@@ -231,6 +235,7 @@ export function CircleProvider({ children }: { children: React.ReactNode }) {
           contractAddress,
           abiFunctionSignature: abiFunctionSignature(abi, functionName),
           abiParameters: serializeAbiParams(args),
+          amount,
         }),
       }).then((r) => r.json());
       if (res.error) throw new Error(res.error);

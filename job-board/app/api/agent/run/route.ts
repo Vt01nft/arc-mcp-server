@@ -28,6 +28,7 @@ import {
   castVoteSafe,
   bridgeToErc8183,
   getJury,
+  slotForMember,
   JUROR_SLOTS,
 } from "@/lib/jury";
 
@@ -300,8 +301,18 @@ export async function POST(req: NextRequest) {
       // (a) JURY PATH
       try {
         const seatTx = await seatJuryFor(BigInt(jobId), job.budget);
+        // selectJury draws 3 at random from the whole active pool, which may
+        // now include human evaluators. Only vote for the slots WE own
+        // (project AI jurors); human members vote for themselves on the /jury
+        // page. Map the drawn members to our slots by address.
+        const seated = await getJury(BigInt(jobId));
+        const aiSlots = seated.members
+          .map((m) => slotForMember(m))
+          .filter((s): s is (typeof JUROR_SLOTS)[number] => s !== null);
+        const humanCount = 3 - aiSlots.length;
+
         const verdicts = await Promise.all(
-          JUROR_SLOTS.map((slot) =>
+          aiSlots.map((slot) =>
             jurorEvaluate(slot, job.description, deliverable)
           )
         );
@@ -322,10 +333,10 @@ export async function POST(req: NextRequest) {
           approved ? finalJury.approves : finalJury.rejects
         }-${approved ? finalJury.rejects : finalJury.approves}: ${
           verdicts.map((v) => `${v.modelLabel.split(":").pop()}=${v.approve ? "Y" : "N"}`).join(", ")
-        }`;
+        }${humanCount > 0 ? ` (+${humanCount} human juror${humanCount > 1 ? "s" : ""} pending)` : ""}`;
 
         if (finalJury.resolved && jobRow) {
-          // Persist one row per juror so the job page can show real diversity.
+          // Persist one row per AI juror so the job page can show real diversity.
           await Promise.all(
             verdicts.map((v) =>
               db.from("evaluations").insert({
@@ -340,6 +351,10 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        // Bridge only once the jury has actually resolved on-chain. With human
+        // jurors in the mix the AI votes alone may not reach 2-of-3, so the
+        // job stays Submitted until the humans vote and a later /api/jury/bridge
+        // (or forceResolve after the window) finalizes it.
         if (finalJury.resolved) {
           const bridged = await bridgeToErc8183(
             BigInt(jobId),

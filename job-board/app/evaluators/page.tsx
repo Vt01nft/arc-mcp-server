@@ -2,17 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { EvaluatorPool } from "@/lib/jury";
+import { useCircle } from "@/components/CircleProvider";
+import { ADDRESSES } from "@/contracts/addresses";
+import { EVALUATOR_REGISTRY_ABI } from "@/contracts/abis";
 
 const EXPLORER = "https://testnet.arcscan.app";
+const MIN_STAKE = "10"; // native USDC; matches EvaluatorRegistry.MIN_STAKE
 
 function short(h: string) {
   return h ? `${h.slice(0, 6)}...${h.slice(-4)}` : "";
 }
 
 export default function EvaluatorsPage() {
+  const circle = useCircle();
   const [pool, setPool] = useState<EvaluatorPool | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollMsg, setEnrollMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -33,6 +40,54 @@ export default function EvaluatorsPage() {
     const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, [load]);
+
+  const myAddr = circle.address?.toLowerCase();
+  const me = pool?.evaluators.find((e) => e.address.toLowerCase() === myAddr);
+  const isActiveJuror = !!me?.active;
+
+  async function enroll() {
+    if (circle.status !== "ready") {
+      setEnrollMsg("Sign in with Circle first (button in the header).");
+      return;
+    }
+    setEnrolling(true);
+    setEnrollMsg(null);
+    try {
+      // register() is payable: msg.value = 10 native USDC stake.
+      await circle.execute({
+        address: ADDRESSES.EVALUATOR_REGISTRY,
+        abi: EVALUATOR_REGISTRY_ABI,
+        functionName: "register",
+        args: [],
+        amount: MIN_STAKE,
+      });
+      setEnrollMsg("Staked 10 USDC. You are now in the juror pool.");
+      setTimeout(load, 2500);
+    } catch (e) {
+      setEnrollMsg(e instanceof Error ? e.message : "Enrollment failed.");
+    } finally {
+      setEnrolling(false);
+    }
+  }
+
+  async function resign() {
+    setEnrolling(true);
+    setEnrollMsg(null);
+    try {
+      await circle.execute({
+        address: ADDRESSES.EVALUATOR_REGISTRY,
+        abi: EVALUATOR_REGISTRY_ABI,
+        functionName: "deregister",
+        args: [],
+      });
+      setEnrollMsg("Deregistered. Your 10 USDC stake was returned.");
+      setTimeout(load, 2500);
+    } catch (e) {
+      setEnrollMsg(e instanceof Error ? e.message : "Deregister failed.");
+    } finally {
+      setEnrolling(false);
+    }
+  }
 
   const tiles = pool
     ? [
@@ -113,6 +168,63 @@ export default function EvaluatorsPage() {
           </p>
         </div>
       )}
+
+      {/* Become a juror — Circle-signed register() staking 10 USDC native. */}
+      <div className="paper-card" style={{ marginBottom: 24, padding: "20px 22px" }}>
+        <div className="eyebrow accent" style={{ marginBottom: 8 }}>
+          {isActiveJuror ? "You are a juror" : "Become a juror"}
+        </div>
+        {isActiveJuror ? (
+          <>
+            <p style={{ margin: "0 0 14px", fontSize: 14, lineHeight: 1.65, color: "var(--ink-2)" }}>
+              Your wallet is in the active pool with {Number(me?.stake ?? 0).toFixed(0)}{" "}
+              USDC staked
+              {me && me.totalVotes > 0
+                ? ` and ${me.correctVotes}/${me.totalVotes} correct votes`
+                : ""}
+              . You may be drawn onto any job&rsquo;s jury; vote from the job&rsquo;s{" "}
+              <span className="mono">/jury</span> page. Deregistering returns your
+              stake (blocked while you sit on an active jury).
+            </p>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={resign}
+              disabled={enrolling}
+              style={{ height: 38, padding: "0 14px", fontSize: 13 }}
+            >
+              {enrolling ? "Working…" : "Deregister & withdraw stake"}
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: "0 0 14px", fontSize: 14, lineHeight: 1.65, color: "var(--ink-2)" }}>
+              Stake 10 USDC to join the jury pool. You will be drawn at random
+              onto job juries, earn a share of the 5% fee for voting with the
+              majority, and lose part of your stake for minority votes. Signed
+              with your Circle wallet, one PIN.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={enroll}
+              disabled={enrolling || circle.status !== "ready"}
+              style={{ height: 40, padding: "0 16px", fontSize: 13 }}
+            >
+              {enrolling
+                ? "Staking…"
+                : circle.status !== "ready"
+                ? "Sign in with Circle to join"
+                : "Stake 10 USDC & join the pool"}
+            </button>
+          </>
+        )}
+        {enrollMsg && (
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ink-2)" }}>
+            {enrollMsg}
+          </p>
+        )}
+      </div>
 
       <div className="paper-card" style={{ padding: 0, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>

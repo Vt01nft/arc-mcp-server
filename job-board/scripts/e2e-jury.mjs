@@ -131,8 +131,8 @@ log(`  job final status=${STATUS[j2.status]} (${j2.status})`);
 
 log(`\n[${stamp()}] step 4: confirm registry tallies updated for the 3 jurors ...`);
 for (const m of members) {
-  const ev = await pub.readContract({ address: REGISTRY, abi: REG_ABI, functionName: "evaluators", args: [m] });
-  log(`  ${m} stake=${formatUnits(ev.stake, 18)} votes=${ev.correctVotes}/${ev.totalVotes} active=${ev.active}`);
+  const [stake, total, correct, active] = await pub.readContract({ address: REGISTRY, abi: REG_ABI, functionName: "evaluators", args: [m] });
+  log(`  ${m} stake=${formatUnits(stake, 18)} votes=${correct}/${total} active=${active}`);
 }
 
 const ok =

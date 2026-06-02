@@ -2,6 +2,7 @@
 // MultiEvaluatorHook). Reads, jury seating, vote signing, and ERC-8183
 // settlement bridge all live here so the runner stays orchestration-only.
 import { formatUnits, keccak256, toBytes, parseUnits } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { publicClient, getWalletClient, getSignerFromEnv } from "./viem";
 import { ADDRESSES } from "@/contracts/addresses";
 import {
@@ -154,6 +155,37 @@ export type JurorSlot = (typeof JUROR_SLOTS)[number];
 
 export function jurorPkEnv(slot: JurorSlot): string {
   return `EVALUATOR_PK_${slot}`;
+}
+
+// The wallet address behind a project-juror slot, derived from its key.
+// Returns null if the key isn't configured. Cached per slot.
+const projectJurorAddrCache = new Map<JurorSlot, `0x${string}` | null>();
+export function projectJurorAddress(slot: JurorSlot): `0x${string}` | null {
+  if (projectJurorAddrCache.has(slot)) return projectJurorAddrCache.get(slot)!;
+  const pk = process.env[jurorPkEnv(slot)];
+  let addr: `0x${string}` | null = null;
+  if (pk) {
+    try {
+      addr = privateKeyToAccount(
+        (pk.startsWith("0x") ? pk : `0x${pk}`) as `0x${string}`
+      ).address;
+    } catch {
+      addr = null;
+    }
+  }
+  projectJurorAddrCache.set(slot, addr);
+  return addr;
+}
+
+// Which project slot (if any) owns a drawn jury member. Members that map to
+// no slot are human jurors who vote for themselves via the /jury page.
+export function slotForMember(addr: string): JurorSlot | null {
+  const lower = (addr ?? "").toLowerCase();
+  for (const slot of JUROR_SLOTS) {
+    const a = projectJurorAddress(slot);
+    if (a && a.toLowerCase() === lower) return slot;
+  }
+  return null;
 }
 
 export async function castVoteAs(
