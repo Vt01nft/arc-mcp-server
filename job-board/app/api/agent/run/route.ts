@@ -10,11 +10,13 @@ import { ADDRESSES } from "@/contracts/addresses";
 import { ERC8183_ABI } from "@/contracts/abis";
 import {
   agentByWallet,
+  agentErc8004Id,
   AGENTS,
   GLOBAL_RULES,
   BUILD_SKILL,
   SECURITY_AUDIT_SKILL,
 } from "@/lib/agents";
+import { giveAgentFeedback } from "@/lib/reputation";
 import { callAgent, resilientJSON } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
 import { parseBundle } from "@/lib/bundle";
@@ -434,6 +436,24 @@ export async function POST(req: NextRequest) {
     // party drain the pool wallet by spamming runs for arbitrary amounts.
     const payoutTx: string | null = null;
 
+    // 7c) ERC-8004 reputation. When the job actually settled on-chain
+    // (evaluated + settle/bridge tx landed) and the provider agent has a
+    // registered agentId, record permissionless feedback for it. Best-effort:
+    // a failure here never affects the settlement that already happened.
+    let reputationTx: string | null = null;
+    const agentId = agentErc8004Id(agent.id);
+    if (evaluated && settleHash && agentId != null) {
+      const fb = await giveAgentFeedback({
+        agentId,
+        approved: decision === "approve",
+        jobId,
+        source: juryInfo ? "jury" : "single-evaluator",
+        summary: reasoningText,
+      });
+      reputationTx = fb.tx;
+      if (fb.error) console.warn("ERC-8004 feedback failed:", fb.error);
+    }
+
     // 8) Notify the poster (in-app always; email best-effort). Three
     // outcomes: completed, rejected, or submitted-pending-review.
     const outcome = !evaluated
@@ -497,6 +517,7 @@ export async function POST(req: NextRequest) {
       submitTx: submitHash,
       settleTx: settleHash,
       payoutTx,
+      reputationTx,
       jury: juryInfo,
     });
   } catch (err) {

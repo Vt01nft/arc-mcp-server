@@ -10,8 +10,8 @@ import { supabase, type Job } from "@/lib/supabase";
 import { JobCard } from "@/components/ui/JobCard";
 
 type ReputationData = {
-  totalScore: bigint;
-  eventCount: bigint;
+  totalScore: number; // sum of feedback values (each scaled by its decimals)
+  eventCount: number;
 };
 
 export default function AgentProfilePage() {
@@ -27,20 +27,39 @@ export default function AgentProfilePage() {
     async function fetchAgent() {
       setLoading(true);
       try {
+        // The ERC-8004 reputation impl exposes readAllFeedback (not the older
+        // getReputation). Pull every non-revoked feedback entry for this agent
+        // and derive a score: each value is scaled by its own valueDecimals.
         const [rep, jobsRes] = await Promise.all([
           publicClient.readContract({
             address: ADDRESSES.ERC8004_REPUTATION,
             abi: ERC8004_REPUTATION_ABI,
-            functionName: "getReputation",
-            args: [BigInt(agentId)],
-          }) as Promise<[bigint, bigint]>,
+            functionName: "readAllFeedback",
+            args: [BigInt(agentId), [], "", "", false],
+          }) as Promise<
+            [
+              readonly `0x${string}`[],
+              readonly bigint[],
+              readonly bigint[],
+              readonly number[],
+              readonly string[],
+              readonly string[],
+              readonly boolean[],
+            ]
+          >,
           supabase
             .from("jobs")
             .select("*")
             .order("created_at", { ascending: false })
             .limit(20),
         ]);
-        setReputation({ totalScore: rep[0], eventCount: rep[1] });
+        const values = rep[2];
+        const decimals = rep[3];
+        const totalScore = values.reduce(
+          (sum, v, i) => sum + Number(v) / 10 ** Number(decimals[i] ?? 0),
+          0
+        );
+        setReputation({ totalScore, eventCount: values.length });
         if (jobsRes.data) setJobs(jobsRes.data);
       } catch {
         // show error state below
@@ -51,8 +70,8 @@ export default function AgentProfilePage() {
   }, [agentId]);
 
   const score =
-    reputation && reputation.eventCount > 0n
-      ? Number(reputation.totalScore) / Number(reputation.eventCount)
+    reputation && reputation.eventCount > 0
+      ? reputation.totalScore / reputation.eventCount
       : 0;
 
   if (loading) {
@@ -143,7 +162,7 @@ export default function AgentProfilePage() {
                 Total Score
               </p>
               <p className="serif-h" style={{ fontSize: 20, margin: 0 }}>
-                {reputation.totalScore.toString()}
+                {reputation.totalScore.toFixed(0)}
               </p>
             </div>
             <div>
@@ -151,7 +170,7 @@ export default function AgentProfilePage() {
                 Feedback Events
               </p>
               <p className="serif-h" style={{ fontSize: 20, margin: 0 }}>
-                {reputation.eventCount.toString()}
+                {reputation.eventCount}
               </p>
             </div>
           </div>

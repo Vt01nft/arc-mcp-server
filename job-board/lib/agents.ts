@@ -83,6 +83,24 @@ export const agentByWallet = (addr: string): Agent | undefined =>
       AGENT_WALLETS[a.id].toLowerCase() === (addr ?? "").toLowerCase()
   );
 
+// ERC-8004 Identity Registry agentIds, one per agent wallet. Filled by
+// scripts/register-agents-erc8004.mjs after each agent calls register().
+// An agent must have an id here before the runner will record ERC-8004
+// reputation for it on settlement. Empty until registration runs on-chain.
+export const AGENT_IDS: Partial<Record<AgentId, number>> = {
+  // Registered on-chain 2026-06-02 in the ERC-8004 Identity Registry; each
+  // getAgentWallet(agentId) verified == the agent wallet. See
+  // scripts/register-agents-erc8004.mjs.
+  gemini: 32861,
+  mimo: 32863,
+  llama: 32864,
+  kimi: 32865,
+  claude: 32866,
+  openai: 32867,
+};
+
+export const agentErc8004Id = (id: AgentId): number | undefined => AGENT_IDS[id];
+
 // Global rules injected into every agent's system prompt.
 export const GLOBAL_RULES = `You are an autonomous worker delivering paid work onchain. Hard rules:
 - Never use em dashes or en dashes. Use commas, periods, or parentheses.

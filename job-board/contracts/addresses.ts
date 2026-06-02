@@ -32,6 +32,12 @@ export const ADDRESSES = {
   // source: https://docs.arc.network/arc/tutorials/register-your-first-ai-agent
   ERC8004_VALIDATION: "0x8004Cb1BF31DAf7788923b405b754f57acEB4272" as `0x${string}`,
 
+  // ERC-8004: Agent identity registry (ERC-721-style). Agents must register()
+  // here to get an agentId BEFORE the reputation registry will accept
+  // giveFeedback for them. VERIFIED via getIdentityRegistry() on the
+  // reputation proxy + arcscan impl ABI (impl 0x7274e874...). proxy below.
+  ERC8004_IDENTITY: "0x8004A818BFB912233c491871b3d84c89A494BD9e" as `0x${string}`,
+
   // ── Phase 3 / v2 Sprint 2: Multi-evaluator jury ──────────────────────────
   // Deployed from multi-evaluator/script/Deploy.s.sol by the rotated server
   // wallet (PRIVATE_KEY = NEXT_PUBLIC_EVALUATOR_ADDRESS). That wallet is the

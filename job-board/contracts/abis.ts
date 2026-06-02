@@ -238,22 +238,48 @@ export const ERC8183_ABI = [
 export const ERC8004_REPUTATION_ABI = [
   // ── Write ──
   {
-    // giveFeedback - confirmed signature from Arc docs
-    // source: https://docs.arc.network/arc/tutorials/register-your-first-ai-agent
+    // giveFeedback - field names VERIFIED against the deployed impl ABI on
+    // arcscan (reputation impl 0x16e0fa7f...). Positional types match the
+    // older guessed names so the selector is unchanged; names corrected here
+    // for honest semantics. `value`/`valueDecimals` carry the score (e.g.
+    // value=100, valueDecimals=0 => integer score 100). Open-caller.
     name: "giveFeedback",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [
       { name: "agentId", type: "uint256" },
-      { name: "score", type: "int128" },        // -100 to 100
-      { name: "feedbackType", type: "uint8" },  // 0 = general
-      { name: "tag", type: "string" },
-      { name: "strengths", type: "string" },
-      { name: "improvements", type: "string" },
-      { name: "context", type: "string" },
+      { name: "value", type: "int128" },         // score, scaled by valueDecimals
+      { name: "valueDecimals", type: "uint8" },  // 0 => value is an integer score
+      { name: "tag1", type: "string" },
+      { name: "tag2", type: "string" },
+      { name: "endpoint", type: "string" },
+      { name: "feedbackURI", type: "string" },
       { name: "feedbackHash", type: "bytes32" },
     ],
     outputs: [],
+  },
+  {
+    // readAllFeedback - VERIFIED from impl ABI. Used to confirm feedback
+    // landed on-chain after giveFeedback.
+    name: "readAllFeedback",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "clientAddresses", type: "address[]" },
+      { name: "tag1", type: "string" },
+      { name: "tag2", type: "string" },
+      { name: "includeRevoked", type: "bool" },
+    ],
+    outputs: [
+      { name: "clients", type: "address[]" },
+      { name: "feedbackIndexes", type: "uint64[]" },
+      { name: "values", type: "int128[]" },
+      { name: "valueDecimals", type: "uint8[]" },
+      { name: "tag1s", type: "string[]" },
+      { name: "tag2s", type: "string[]" },
+      { name: "revokedStatuses", type: "bool[]" },
+    ],
   },
   // ── Read ──
   {
@@ -275,6 +301,57 @@ export const ERC8004_REPUTATION_ABI = [
       { name: "validator", type: "address", indexed: true },
       { name: "score", type: "int128", indexed: false },
       { name: "tag", type: "string", indexed: false },
+    ],
+  },
+] as const;
+
+// ─── ERC-8004: Agent Identity Registry ────────────────────────────────────────
+// ERC-721-style identity. register() mints an agentId owned by msg.sender.
+// VERIFIED from the deployed impl ABI on arcscan (impl 0x7274e874...).
+// Identity registry proxy: 0x8004A818BFB912233c491871b3d84c89A494BD9e
+export const ERC8004_IDENTITY_ABI = [
+  // ── Write ──
+  {
+    // register the caller as a new agent, returns the new agentId.
+    name: "register",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [{ name: "agentId", type: "uint256" }],
+  },
+  {
+    name: "setAgentURI",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "agentId", type: "uint256" },
+      { name: "agentURI", type: "string" },
+    ],
+    outputs: [],
+  },
+  // ── Read ──
+  {
+    name: "getAgentWallet",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "agentId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    name: "ownerOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  // ── Events ──
+  {
+    name: "Registered",
+    type: "event",
+    inputs: [
+      { name: "agentId", type: "uint256", indexed: true },
+      { name: "agentURI", type: "string", indexed: false },
+      { name: "owner", type: "address", indexed: true },
     ],
   },
 ] as const;
