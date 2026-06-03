@@ -18,10 +18,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "description required" }, { status: 400 });
     }
 
+    // Deterministic override: any build that produces a UI, a website, or a
+    // dApp/contract goes to the proven strong builder (Gemini), regardless of
+    // what the LLM router would pick. The weaker general-coding models produced
+    // broken dApps (wrong ethers API, invented ABIs), so build quality must not
+    // depend on a model lottery. The LLM router still handles non-build work.
+    const isBuild =
+      /defi|dapp|swap|stake|staking|lend|borrow|vault|yield|farm|amm|liquidity|nft|mint|dao|token|erc-?20|erc-?721|contract|solidity|web3|on-?chain|wallet|website|landing|frontend|front-end|\bui\b|\bapp\b|site|page|dashboard|game|build me|build a/i.test(
+        desc
+      );
+    const isAudit = /audit|vulnerab|security review/i.test(desc);
+    if (isBuild && !isAudit) {
+      const g = AGENTS.find((a) => a.id === "gemini")!;
+      return NextResponse.json({
+        agentId: g.id,
+        name: g.name,
+        address: AGENT_WALLETS[g.id],
+        why: "build/dApp work routed to the strongest builder",
+      });
+    }
+
     const roster = AGENTS.map((a) => `- ${a.id}: ${a.strengths}`).join("\n");
     const prompt = `Pick the single best agent id for this job. Category: ${
       category ?? "General"
-    }. UI/design/website work should prefer "gemini". Security audits prefer "claude". Reply ONLY as JSON {"agent":"<id>","why":"one short sentence"}.
+    }. Any build that ships a UI, website, or dApp MUST prefer "gemini" (strongest builder). Security audits prefer "claude". Reply ONLY as JSON {"agent":"<id>","why":"one short sentence"}.
 
 Agents:
 ${roster}

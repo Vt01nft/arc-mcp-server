@@ -138,7 +138,13 @@ export const ARC_CONTEXT = `Arc + Circle context (use these EXACT values for any
 - Gas token is USDC. Native USDC is 18-decimal; the USDC ERC-20 transfer interface is 6-decimal at 0x3600000000000000000000000000000000000000. Show user-facing amounts in 6-decimal USDC.
 - Core contracts: ERC-8183 job escrow 0x0747EEf0706327138c69792bF28Cd525089e4583; ERC-8004 reputation 0x8004B663056A597Dffe9eCcC1965A193B7388713; ERC-8004 identity 0x8004A818BFB912233c491871b3d84c89A494BD9e.
 - CCTP v2 (cross-chain USDC): TokenMessengerV2 0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA, MessageTransmitterV2 0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275, Arc domain 26.
-- Wallet wiring (ethers v6 from CDN): reads via new ethers.JsonRpcProvider("https://rpc.testnet.arc.network"); writes via window.ethereum if present, with a wallet_addEthereumChain fallback using the params above. Note in the UI that the production host (Arc Job) uses Circle programmable wallets (email + PIN, no extension) so an injected wallet is optional.`;
+- Wallet wiring (ethers v6 from CDN): reads via new ethers.JsonRpcProvider("https://rpc.testnet.arc.network"); writes via window.ethereum if present, with a wallet_addEthereumChain fallback using the params above. Note in the UI that the production host (Arc Job) uses Circle programmable wallets (email + PIN, no extension) so an injected wallet is optional.
+
+CRITICAL wiring rules (these are the usual failure points - get them right or the dApp is broken):
+- ethers v6 API ONLY. It is ethers.formatUnits / ethers.parseUnits / ethers.Contract / ethers.JsonRpcProvider / ethers.BrowserProvider. There is NO ethers.utils.* and NO ethers.providers.* in v6 - using them throws on load. Load from https://cdn.jsdelivr.net/npm/ethers@6.x/dist/ethers.umd.min.js.
+- A state-changing call (anything that costs gas) MUST use a signer: const signer = await new ethers.BrowserProvider(window.ethereum).getSigner(); new ethers.Contract(addr, abi, signer). NEVER call a write method on a JsonRpcProvider (read-only) - it will fail.
+- NEVER invent contract addresses or ABIs. The addresses above are ONLY for their exact standard (ERC-8183 escrow, ERC-8004, CCTP). Do not attach made-up functions like swap()/getBalance() to them. If your dApp needs a contract you have not actually deployed, DO NOT point at a random address - use DEMO mode (simulate balances/pools/APR in plain JS state) so the UI is fully interactive, and clearly label it demo.
+- USDC math: always ethers.parseUnits(amount, 6) before sending and ethers.formatUnits(value, 6) for display. Any spend of USDC by another contract needs an approve() to that contract first (approve-then-act).`;
 
 // Skill: full working DeFi dApp. Appended when the brief is DeFi-shaped.
 export const DEFI_SKILL = `Skill - DeFi dApp (full working build, not a mockup):
