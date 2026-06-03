@@ -11,7 +11,7 @@ import {
   ERC8183_ABI,
 } from "@/contracts/abis";
 import { geminiJSON } from "./gemini";
-import { openrouterJSON } from "./ai";
+import { openrouterJSON, openrouterText } from "./ai";
 
 const REGISTRY = ADDRESSES.EVALUATOR_REGISTRY;
 const HOOK = ADDRESSES.MULTI_EVALUATOR_HOOK;
@@ -267,6 +267,18 @@ export type JurorVerdict = {
   confidence: number;
 };
 
+// Some OpenRouter models intermittently reject response_format json_object,
+// which would silently drop a juror to a fail-closed reject and weaken the
+// jury's model diversity. Try JSON mode first, then fall back to a plain
+// completion (the prompt already asks for JSON only; we extract it downstream).
+async function openrouterJuror(model: string, prompt: string): Promise<string> {
+  try {
+    return await openrouterJSON(prompt, 1024, model);
+  } catch {
+    return openrouterText(model, "Return ONLY a single JSON object, no prose.", prompt, 1024);
+  }
+}
+
 const JUROR_MODELS: Record<JurorSlot, { label: string; run: (p: string) => Promise<string> }> = {
   1: {
     label: "gemini-2.5-flash",
@@ -274,11 +286,11 @@ const JUROR_MODELS: Record<JurorSlot, { label: string; run: (p: string) => Promi
   },
   2: {
     label: "openrouter:openai/gpt-4o-mini",
-    run: (p) => openrouterJSON(p, 1024, "openai/gpt-4o-mini"),
+    run: (p) => openrouterJuror("openai/gpt-4o-mini", p),
   },
   3: {
     label: "openrouter:anthropic/claude-sonnet-4.5",
-    run: (p) => openrouterJSON(p, 1024, "anthropic/claude-sonnet-4.5"),
+    run: (p) => openrouterJuror("anthropic/claude-sonnet-4.5", p),
   },
 };
 

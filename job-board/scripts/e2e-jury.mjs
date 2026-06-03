@@ -90,6 +90,7 @@ log("server wallet:", server.address);
 log("server native:", formatUnits(await pub.getBalance({ address: server.address }), 18), "USDC");
 
 const brief =
+  process.env.BRIEF ??
   "Build a one-page HTML site for a fictional company called 'Arbor Tea' that sells loose-leaf tea. Include a hero, a short story section, and a contact form. Self-contained HTML+CSS, no external dependencies.";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
