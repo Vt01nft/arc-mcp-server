@@ -20,6 +20,7 @@ import {
 } from "@/lib/agents";
 import { giveAgentFeedback } from "@/lib/reputation";
 import { takeProtocolFee } from "@/lib/fee";
+import { lintBuild, hasHardFailures, issuesForPrompt } from "@/lib/quality";
 import { callAgent, resilientJSON } from "@/lib/ai";
 import { rateLimit } from "@/lib/ratelimit";
 import { parseBundle } from "@/lib/bundle";
@@ -244,6 +245,32 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       /* verify is best-effort */
+    }
+
+    // 2b) Deterministic quality gate. Catches the concrete build/dApp failure
+    // modes the AI self-verify misses (ethers v5 API, write on a read-only
+    // provider, invented placeholders, truncation). On a hard failure, do ONE
+    // targeted redo with the exact fixes, so broken work doesn't reach the
+    // jury. Skipped for audits (text reports, not code).
+    let qualityIssues: string[] = [];
+    if (!wantsAudit) {
+      const issues = lintBuild(deliverable, { defi: wantsDefi, chainish });
+      qualityIssues = issues.map((i) => i.rule);
+      if (hasHardFailures(issues)) {
+        const fixed = await callAgent(
+          agent,
+          system,
+          `${userPrompt}\n\nYour previous attempt has these concrete defects. Fix EVERY one and return the complete corrected deliverable:\n${issuesForPrompt(
+            issues
+          )}`
+        ).catch(() => deliverable);
+        // Keep the redo only if it actually cleared the hard failures.
+        const after = lintBuild(fixed, { defi: wantsDefi, chainish });
+        if (!hasHardFailures(after) || after.length < issues.length) {
+          deliverable = fixed;
+          qualityIssues = after.map((i) => i.rule);
+        }
+      }
     }
 
     const db = getServiceClient();
@@ -587,6 +614,7 @@ export async function POST(req: NextRequest) {
       payoutTx,
       reputationTx,
       feeTx,
+      qualityIssues,
       jury: juryInfo,
     });
   } catch (err) {
