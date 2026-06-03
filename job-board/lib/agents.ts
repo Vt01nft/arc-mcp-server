@@ -112,12 +112,41 @@ export const GLOBAL_RULES = `You are an autonomous worker delivering paid work o
 - Single file: output only that file's raw contents, nothing before or after.
 - Multi-file only: prefix each file with a line: === path/to/file ===`;
 
-// Skill: building software / sites / dApps.
-export const BUILD_SKILL = `Skill - build:
-- Produce production quality, fully working output. Prefer a single self-contained file when it can run standalone (e.g. one index.html with inline CSS/JS) so it is previewable.
-- For a multi-file app or dApp, deliver every file in full (config, components, contracts, README with exact run/deploy steps).
-- For a dApp: include the Solidity contract(s) and a working frontend that talks to them, with addresses/ABIs wired and clear deploy instructions.
-- Strong, modern, clean UI. Real content, not lorem ipsum.`;
+// Skill: building software / sites / dApps. The deliverable is previewed in a
+// sandboxed iframe (allow-scripts, no allow-same-origin), so a single
+// self-contained index.html with CDN libraries renders live.
+export const BUILD_SKILL = `Skill - build (production sites, apps, dApps):
+
+OUTPUT SHAPE
+- Strongly prefer ONE self-contained index.html: inline <style> and <script>, libraries from a CDN via <script src> (ethers@6, chart.js, etc.). It must run with no build step in a sandboxed iframe. Only go multi-file when the brief genuinely needs it; then deliver every file in full plus a README with exact run/deploy steps.
+
+DESIGN (this is graded - it must look deliberately designed, not generated)
+- Typography: load a real Google Fonts pairing via <link>. A characterful display face for headings (Fraunces, Instrument Serif, Space Grotesk, or Clash Display) paired with a clean sans for body (Inter, Geist, IBM Plex Sans). Define a type scale (13 / 15 / 18 / 24 / 32 / 48 px), tight heading line-height (1.05-1.2), readable body (1.5-1.65). Never leave default Times/Arial.
+- Layout: a max-width container (1100-1200px), an 8px spacing grid, real sections with generous whitespace and clear hierarchy. CSS grid/flex. Never a single centered card on an empty page.
+- Color: a deliberate palette with ONE accent, declared as CSS variables (--bg, --ink, --muted, --accent, --rule). Commit to either a clean editorial light theme or a refined dark theme. Avoid the purple-to-blue gradient "AI app" cliche.
+- Components: buttons with hover/active/disabled and focus rings, consistent radius, subtle borders and shadows, 150-200ms transitions. Fully responsive down to 375px.
+- Content: specific, real copy. No lorem ipsum, no "Feature One / Feature Two".
+
+QUALITY
+- It must actually work. Wire every button, input, and state. No dead links, no TODOs, no placeholders, no truncation. Runs as-is.
+- Accessible: semantic HTML, <label> on inputs, sufficient contrast, keyboard usable.`;
+
+// Real Arc + Circle facts so on-chain work targets the right network and the
+// dApp can actually connect. Appended whenever a brief is chain/wallet/DeFi-ish.
+export const ARC_CONTEXT = `Arc + Circle context (use these EXACT values for any on-chain or wallet work):
+- Network: Arc Testnet, chainId 5042002 (0x4CEE52 hex), RPC https://rpc.testnet.arc.network, explorer https://testnet.arcscan.app, faucet https://faucet.circle.com.
+- Gas token is USDC. Native USDC is 18-decimal; the USDC ERC-20 transfer interface is 6-decimal at 0x3600000000000000000000000000000000000000. Show user-facing amounts in 6-decimal USDC.
+- Core contracts: ERC-8183 job escrow 0x0747EEf0706327138c69792bF28Cd525089e4583; ERC-8004 reputation 0x8004B663056A597Dffe9eCcC1965A193B7388713; ERC-8004 identity 0x8004A818BFB912233c491871b3d84c89A494BD9e.
+- CCTP v2 (cross-chain USDC): TokenMessengerV2 0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA, MessageTransmitterV2 0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275, Arc domain 26.
+- Wallet wiring (ethers v6 from CDN): reads via new ethers.JsonRpcProvider("https://rpc.testnet.arc.network"); writes via window.ethereum if present, with a wallet_addEthereumChain fallback using the params above. Note in the UI that the production host (Arc Job) uses Circle programmable wallets (email + PIN, no extension) so an injected wallet is optional.`;
+
+// Skill: full working DeFi dApp. Appended when the brief is DeFi-shaped.
+export const DEFI_SKILL = `Skill - DeFi dApp (full working build, not a mockup):
+- Deliver BOTH sides: the Solidity contract(s) AND a frontend wired to them on Arc.
+- Contracts: compilable Solidity ^0.8.24. Use battle-tested patterns (ERC20, Ownable, ReentrancyGuard) - inline minimal versions or import from a CDN. Include events, require checks, short NatSpec, and follow checks-effects-interactions (no reentrancy, no unchecked external calls).
+- Frontend: connect wallet, read live on-chain state (balances, pool/vault TVL, APR, prices), and execute the core action (swap / stake / mint / provide-liquidity / lend) with correct 6-decimal USDC math, an approve-then-act flow, and explicit pending / success / error states with tx links to testnet.arcscan.app.
+- If the contract is not yet deployed, ship a clearly-labelled DEMO mode that simulates state locally so the UI is fully interactive in the preview, with the real on-chain wiring present and ready to switch on once an address is set. Provide a README with exact deploy steps (Foundry or Remix) and where to paste the deployed address.
+- It must be genuinely usable and look good per the design rules above. A DeFi dApp that looks like a toy or has dead buttons fails the brief.`;
 
 // Skill: security audit (distilled from the provided methodology).
 export const SECURITY_AUDIT_SKILL = `Skill - security audit of a vibe-coded app, website, or GitHub repo.

@@ -14,6 +14,8 @@ import {
   AGENTS,
   GLOBAL_RULES,
   BUILD_SKILL,
+  DEFI_SKILL,
+  ARC_CONTEXT,
   SECURITY_AUDIT_SKILL,
 } from "@/lib/agents";
 import { giveAgentFeedback } from "@/lib/reputation";
@@ -168,13 +170,32 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const isAudit =
-      /audit|vulnerab|security review/i.test(job.description) ||
-      job.description.length < 4000;
-    const wantsAudit = /audit|vulnerab|security/i.test(job.description);
-    const skill = wantsAudit ? SECURITY_AUDIT_SKILL : BUILD_SKILL;
-    const target = wantsAudit || /https?:\/\//i.test(job.description)
-      ? await fetchTarget(job.description)
+    const desc = job.description;
+    const wantsAudit = /audit|vulnerab|security/i.test(desc);
+    const wantsDefi =
+      /defi|swap|stake|staking|lend|borrow|vault|yield|farm|amm|liquidity|erc-?20|erc-?721|nft|mint|dao|governance|airdrop|tokenomics|presale/i.test(
+        desc
+      );
+    const chainish =
+      wantsDefi ||
+      /\barc\b|circle|wallet|web3|on-?chain|usdc|blockchain|dapp|smart ?contract|solidity|crypto|token/i.test(
+        desc
+      );
+
+    // Compose the build skill with the DeFi and Arc-context modules when the
+    // brief calls for them, so on-chain jobs get real chain facts and dApp
+    // guidance instead of a generic build prompt.
+    let skill: string;
+    if (wantsAudit) {
+      skill = SECURITY_AUDIT_SKILL;
+    } else {
+      skill = BUILD_SKILL;
+      if (wantsDefi) skill += `\n\n${DEFI_SKILL}`;
+      if (chainish) skill += `\n\n${ARC_CONTEXT}`;
+    }
+
+    const target = wantsAudit || /https?:\/\//i.test(desc)
+      ? await fetchTarget(desc)
       : "";
 
     const system = `${GLOBAL_RULES}\n\n${skill}`;
