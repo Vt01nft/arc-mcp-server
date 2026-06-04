@@ -152,7 +152,15 @@ export const DEFI_SKILL = `Skill - DeFi dApp (full working build, not a mockup):
 - Contracts: compilable Solidity ^0.8.24. Use battle-tested patterns (ERC20, Ownable, ReentrancyGuard) - inline minimal versions or import from a CDN. Include events, require checks, short NatSpec, and follow checks-effects-interactions (no reentrancy, no unchecked external calls).
 - Frontend: connect wallet, read live on-chain state (balances, pool/vault TVL, APR, prices), and execute the core action (swap / stake / mint / provide-liquidity / lend) with correct 6-decimal USDC math, an approve-then-act flow, and explicit pending / success / error states with tx links to testnet.arcscan.app.
 - If the contract is not yet deployed, ship a clearly-labelled DEMO mode that simulates state locally so the UI is fully interactive in the preview, with the real on-chain wiring present and ready to switch on once an address is set. Provide a README with exact deploy steps (Foundry or Remix) and where to paste the deployed address.
-- It must be genuinely usable and look good per the design rules above. A DeFi dApp that looks like a toy or has dead buttons fails the brief.`;
+- It must be genuinely usable and look good per the design rules above. A DeFi dApp that looks like a toy or has dead buttons fails the brief.
+
+COMPLETENESS by type (build the REAL mechanics with correct math - jurors reject incomplete protocols):
+- Staking / vault: deposit, withdraw, rewards that accrue over time, APR, total staked / TVL, your position.
+- Swap / AMM: a constant-product (x*y=k) pool, both swap directions, price + slippage / minimum-received, add and remove liquidity, your LP share.
+- Lending / borrowing: supply + withdraw, COLLATERAL deposit, borrow LIMITED by a collateral factor / LTV, repay, and a HEALTH FACTOR that blocks unsafe borrows and shows liquidation risk, plus utilization-based APR. A borrow with no collateral or no health check is incomplete and will be rejected.
+- Token / presale: an ERC20 with a real cap, a buy flow priced in USDC, and claimed / remaining display.
+- NFT mint: an ERC721 with a supply cap, mint price in USDC, a minted / remaining counter, and a gallery of minted ids.
+Whatever the type, wire EVERY primary action end to end with the correct economic math, not a stub.`;
 
 // Skill: security audit (distilled from the provided methodology).
 export const SECURITY_AUDIT_SKILL = `Skill - security audit of a vibe-coded app, website, or GitHub repo.
