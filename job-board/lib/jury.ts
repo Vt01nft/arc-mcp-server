@@ -324,39 +324,51 @@ function evalPrompt(brief: string, deliverable: string): string {
   );
 }
 
+function parseVerdict(slot: JurorSlot, label: string, raw: string): JurorVerdict {
+  const json = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as {
+    approve?: boolean;
+    reasoning?: string;
+    confidence?: number;
+  };
+  return {
+    slot,
+    modelLabel: label,
+    approve: json.approve === true,
+    reasoning: (json.reasoning ?? "no reasoning").slice(0, 800),
+    confidence:
+      typeof json.confidence === "number"
+        ? Math.min(1, Math.max(0, json.confidence))
+        : 0,
+  };
+}
+
 export async function jurorEvaluate(
   slot: JurorSlot,
   brief: string,
   deliverable: string
 ): Promise<JurorVerdict> {
   const { label, run } = JUROR_MODELS[slot];
-  // On a model error we fail closed (reject with low confidence) rather than
-  // crash the runner; the bridge then sends the actual ERC-8183 outcome.
+  const prompt = evalPrompt(brief, deliverable);
   try {
-    const raw = await run(evalPrompt(brief, deliverable));
-    const json = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as {
-      approve?: boolean;
-      reasoning?: string;
-      confidence?: number;
-    };
-    return {
-      slot,
-      modelLabel: label,
-      approve: json.approve === true,
-      reasoning: (json.reasoning ?? "no reasoning").slice(0, 800),
-      confidence:
-        typeof json.confidence === "number"
-          ? Math.min(1, Math.max(0, json.confidence))
-          : 0,
-    };
-  } catch (e) {
-    return {
-      slot,
-      modelLabel: `${label} (errored)`,
-      approve: false,
-      reasoning: `evaluator failed: ${(e as Error).message?.slice(0, 200) ?? "unknown"}`,
-      confidence: 0,
-    };
+    return parseVerdict(slot, label, await run(prompt));
+  } catch {
+    // The slot's model failed entirely (transient OpenRouter load is common
+    // under the concurrent 3-juror burst). Do NOT fail closed to a reject -
+    // a technical error must not count as a vote against the work, since that
+    // can unfairly flip a borderline job. Get a real verdict from the reliable
+    // Gemini path so this juror still assesses the actual deliverable; only if
+    // Gemini also fails do we abstain (reject + confidence 0, clearly marked).
+    try {
+      return parseVerdict(slot, `${label} -> gemini fallback`, await geminiJSON(prompt, 1024, 256));
+    } catch (e2) {
+      return {
+        slot,
+        modelLabel: `${label} (errored)`,
+        approve: false,
+        reasoning: `evaluator failed: ${(e2 as Error).message?.slice(0, 200) ?? "unknown"}`,
+        confidence: 0,
+      };
+    }
   }
 }
 
