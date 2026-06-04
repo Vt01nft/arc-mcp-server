@@ -19,22 +19,26 @@ export async function POST(req: NextRequest) {
     }
 
     // Deterministic override: any build that produces a UI, a website, or a
-    // dApp/contract goes to the proven strong builder (Gemini), regardless of
-    // what the LLM router would pick. The weaker general-coding models produced
-    // broken dApps (wrong ethers API, invented ABIs), so build quality must not
-    // depend on a model lottery. The LLM router still handles non-build work.
+    // dApp/contract goes to a strong design builder, regardless of what the LLM
+    // router would pick (weaker general-coding models produced broken dApps).
+    // The builder is configurable via BUILD_AGENT (default "claude" for its UI
+    // design quality); the runner falls back to Gemini if that model errors.
     const isBuild =
       /defi|dapp|swap|stake|staking|lend|borrow|vault|yield|farm|amm|liquidity|nft|mint|dao|token|erc-?20|erc-?721|contract|solidity|web3|on-?chain|wallet|website|landing|frontend|front-end|\bui\b|\bapp\b|site|page|dashboard|game|build me|build a/i.test(
         desc
       );
     const isAudit = /audit|vulnerab|security review/i.test(desc);
     if (isBuild && !isAudit) {
-      const g = AGENTS.find((a) => a.id === "gemini")!;
+      const want = (process.env.BUILD_AGENT ?? "claude").toLowerCase();
+      const b =
+        AGENTS.find((a) => a.id === want) ??
+        AGENTS.find((a) => a.id === "claude") ??
+        AGENTS.find((a) => a.id === "gemini")!;
       return NextResponse.json({
-        agentId: g.id,
-        name: g.name,
-        address: AGENT_WALLETS[g.id],
-        why: "build/dApp work routed to the strongest builder",
+        agentId: b.id,
+        name: b.name,
+        address: AGENT_WALLETS[b.id],
+        why: `build/dApp work routed to ${b.name} for UI/design quality`,
       });
     }
 
