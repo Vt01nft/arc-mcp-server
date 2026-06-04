@@ -267,15 +267,36 @@ export type JurorVerdict = {
   confidence: number;
 };
 
-// Some OpenRouter models intermittently reject response_format json_object,
-// which would silently drop a juror to a fail-closed reject and weaken the
-// jury's model diversity. Try JSON mode first, then fall back to a plain
-// completion (the prompt already asks for JSON only; we extract it downstream).
-async function openrouterJuror(model: string, prompt: string): Promise<string> {
+// A juror that throws fails closed to a reject, silently dropping the jury to
+// 2 models and faking the diversity. Make each OpenRouter juror robust:
+//   1. JSON mode, then a plain completion (some models reject json_object).
+//   2. One retry after a short backoff (handles transient 429/overload, which
+//      is common because the three jurors fire concurrently).
+//   3. A last-resort alternate strong model so the juror still casts a vote.
+const JUROR_ALT_MODEL: Record<string, string> = {
+  "anthropic/claude-sonnet-4.5": "anthropic/claude-sonnet-4",
+  "openai/gpt-4o-mini": "openai/gpt-4o",
+};
+
+async function jsonOrText(model: string, prompt: string): Promise<string> {
   try {
     return await openrouterJSON(prompt, 1024, model);
   } catch {
     return openrouterText(model, "Return ONLY a single JSON object, no prose.", prompt, 1024);
+  }
+}
+
+async function openrouterJuror(model: string, prompt: string): Promise<string> {
+  try {
+    return await jsonOrText(model, prompt);
+  } catch {
+    await new Promise((r) => setTimeout(r, 1200)); // transient backoff
+    try {
+      return await jsonOrText(model, prompt);
+    } catch {
+      const alt = JUROR_ALT_MODEL[model] ?? "openai/gpt-4o";
+      return jsonOrText(alt, prompt);
+    }
   }
 }
 
