@@ -104,9 +104,17 @@ function tryParseBundleManifest(raw: string): BundleManifest | null {
   return null;
 }
 
-function bundleFileUrl(jobId: number, path: string): string {
+// Raw storage URL (Supabase serves these as text/plain) - used for downloads.
+function bundleStorageUrl(jobId: number, path: string): string {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   return `${base}/storage/v1/object/public/deliverables/${jobId}/${path}`;
+}
+
+// Preview proxy on our origin - re-serves with the correct Content-Type behind
+// a CSP sandbox, so the iframe actually RENDERS the deliverable. Use this for
+// the live preview and for opening files in a tab.
+function bundleFileUrl(jobId: number, path: string): string {
+  return `/api/preview/${jobId}/${path}`;
 }
 
 function BundleView({
@@ -129,7 +137,7 @@ function BundleView({
     try {
       const entries = await Promise.all(
         manifest.files.map(async (p) => {
-          const r = await fetch(bundleFileUrl(jobId, p));
+          const r = await fetch(bundleStorageUrl(jobId, p));
           if (!r.ok) throw new Error(`fetch ${p}: ${r.status}`);
           const buf = new Uint8Array(await r.arrayBuffer());
           return { path: p, data: buf };

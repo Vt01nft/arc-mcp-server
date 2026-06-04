@@ -38,6 +38,10 @@ export async function uploadBundleFile(
 ): Promise<string> {
   const db = getServiceClient();
   const key = `${jobId}/${path}`;
+  // NOTE: Supabase serves public-bucket HTML as text/plain + nosniff regardless
+  // of the upload content-type (anti-XSS on their domain), so we do NOT rely on
+  // it for rendering. The job page previews via /api/preview/<jobId>/<path>,
+  // which re-serves with the right Content-Type behind a CSP sandbox.
   const { error } = await db.storage
     .from(BUCKET)
     .upload(key, content, {
