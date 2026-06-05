@@ -29,16 +29,19 @@ export async function POST(req: NextRequest) {
       );
     const isAudit = /audit|vulnerab|security review/i.test(desc);
     if (isBuild && !isAudit) {
-      const want = (process.env.BUILD_AGENT ?? "claude").toLowerCase();
+      // Default to Gemini, the only substantial model that is currently funded
+      // (direct GEMINI key). Set BUILD_AGENT=claude once the OpenRouter or
+      // Anthropic balance has credit to get Claude's UI/design quality; the
+      // runner falls back to Gemini if the chosen model errors.
+      const want = (process.env.BUILD_AGENT ?? "gemini").toLowerCase();
       const b =
         AGENTS.find((a) => a.id === want) ??
-        AGENTS.find((a) => a.id === "claude") ??
         AGENTS.find((a) => a.id === "gemini")!;
       return NextResponse.json({
         agentId: b.id,
         name: b.name,
         address: AGENT_WALLETS[b.id],
-        why: `build/dApp work routed to ${b.name} for UI/design quality`,
+        why: `build/dApp work routed to ${b.name}`,
       });
     }
 
