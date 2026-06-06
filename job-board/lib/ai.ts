@@ -46,15 +46,22 @@ export async function geminiText(
   return t;
 }
 
-/** OpenAI-compatible call through OpenRouter for non-Gemini agents.
- * 16000 output tokens is ~60KB, plenty for any single-file dApp, and keeps the
- * upfront credit reservation low (OpenRouter reserves max_tokens x price, so a
- * 64000 cap made expensive models like Claude 402 on a modest balance). */
+// Build output cap (tokens). Tunable via BUILD_MAX_TOKENS. Default 32000
+// (~120KB) gives complex multi-file dApps room without truncating. Trade-offs:
+// OpenRouter reserves max_tokens x price upfront (bigger cap = fewer builds per
+// dollar on pricey models like Claude), and deliverables are stored up to
+// ~200KB (~50k tokens), so there is little point above ~48000.
+const BUILD_MAX_TOKENS = (() => {
+  const n = parseInt(process.env.BUILD_MAX_TOKENS ?? "", 10);
+  return Number.isFinite(n) && n >= 1000 ? Math.min(n, 64000) : 32000;
+})();
+
+/** OpenAI-compatible call through OpenRouter for non-Gemini agents. */
 export async function openrouterText(
   model: string,
   system: string,
   user: string,
-  maxTokens = 16000
+  maxTokens = BUILD_MAX_TOKENS
 ): Promise<string> {
   const key = process.env.OPENROUTER_KEY;
   if (!key) throw new Error("OPENROUTER_KEY not set");
